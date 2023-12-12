@@ -3,7 +3,7 @@ A Kotlin based Android library to connect Android devices directly without ADB b
 
 ## Express Gratitude 
 
-- [Dadb](https://github.com/mobile-dev-inc/dadb): This library is based on the second development of Dadb, and we would like to thank mobile-dev-inc for all their previous efforts!
+- [Dadb](https://github.com/mobile-dev-inc/dadb): Kadb is based on the second development of Dadb, and we would like to thank mobile-dev-inc for all their previous efforts!
 
 ## Features and Differences
 

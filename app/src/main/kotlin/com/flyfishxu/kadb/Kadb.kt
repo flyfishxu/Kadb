@@ -33,7 +33,7 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 
-interface Dadb : AutoCloseable {
+interface Kadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun open(destination: String): AdbStream
@@ -315,14 +315,14 @@ interface Dadb : AutoCloseable {
 
         @JvmStatic
         @JvmOverloads
-        fun create(host: String, port: Int, keyPair: AdbKeyPair? = read()): Dadb =
-            DadbImpl(host, port, keyPair)
+        fun create(host: String, port: Int, keyPair: AdbKeyPair? = read()): Kadb =
+            KadbImpl(host, port, keyPair)
 
         @JvmStatic
         @JvmOverloads
         fun discover(
             host: String = "localhost", keyPair: AdbKeyPair? = read()
-        ): Dadb? {
+        ): Kadb? {
             return list(host, keyPair).firstOrNull()
         }
 
@@ -330,29 +330,29 @@ interface Dadb : AutoCloseable {
         @JvmOverloads
         fun list(
             host: String = "localhost", keyPair: AdbKeyPair? = read()
-        ): List<Dadb> {
-            val dadbs = AdbServer.listDadbs(adbServerHost = host)
-            if (dadbs.isNotEmpty()) return dadbs
+        ): List<Kadb> {
+            val kadbs = AdbServer.listKadbs(adbServerHost = host)
+            if (kadbs.isNotEmpty()) return kadbs
 
             return (MIN_EMULATOR_PORT..MAX_EMULATOR_PORT).mapNotNull { port ->
-                val dadb = create(host, port, keyPair)
+                val kadb = create(host, port, keyPair)
                 val response = try {
-                    dadb.shell("echo success").allOutput
+                    kadb.shell("echo success").allOutput
                 } catch (ignore: Throwable) {
                     null
                 }
                 if (response == "success\n") {
-                    dadb
+                    kadb
                 } else {
                     null
                 }
             }
         }
 
-        private fun waitRootOrClose(dadb: Dadb, root: Boolean) {
+        private fun waitRootOrClose(kadb: Kadb, root: Boolean) {
             while (true) {
                 try {
-                    val response = dadb.shell("getprop service.adb.root")
+                    val response = kadb.shell("getprop service.adb.root")
                     val propValue = if (root) 1 else 0
                     if (response.output == "$propValue\n") return
                 } catch (e: IOException) {
@@ -361,8 +361,8 @@ interface Dadb : AutoCloseable {
             }
         }
 
-        private fun restartAdb(dadb: Dadb, destination: String): String {
-            dadb.open(destination).use { stream ->
+        private fun restartAdb(kadb: Kadb, destination: String): String {
+            kadb.open(destination).use { stream ->
                 return stream.source.readUntil('\n'.code.toByte()).readString(Charsets.UTF_8)
             }
         }

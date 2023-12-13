@@ -21,8 +21,8 @@ A Kotlin based Android library to connect Android devices directly without ADB b
 Connect to `emulator-5554` and install `apkFile`:
 
 ```kotlin
-Dadb.create("localhost", 5555).use { dadb ->
-    dadb.install(apkFile)
+Kadb.create("localhost", 5555).use { kadb ->
+    kadb.install(apkFile)
 }
 ```
 
@@ -33,7 +33,7 @@ Dadb.create("localhost", 5555).use { dadb ->
 Host: 10.0.0.175;  Port: 37755;  PairCode: 643102
 
 ```kotlin
-Dadb.pair("10.0.0.175", 37755, "643102")
+Kadb.pair("10.0.0.175", 37755, "643102")
 ```
 
 *Note: Pair only works when target device running Android 11 and above*
@@ -43,32 +43,32 @@ Dadb.pair("10.0.0.175", 37755, "643102")
 The following discovers and returns a connected device or emulator. If there are multiple it returns the first one found.
 
 ```kotlin
-val dadb = Dadb.discover()
-if (dadb == null) throw RuntimeException("No adb device found")
+val kadb = Kadb.discover()
+if (kadb == null) throw RuntimeException("No adb device found")
 ```
 
 Use the following API if you want to list all available devices:
 
 ```kotlin
-val dadbs = Dadb.list()
+val kadbs = Kadb.list()
 ```
 
 ### Connecting to a physical device
 
 *Prerequisite: Connecting to a physical device requires a running adb server. In most cases, this means that you must have the `adb` binary installed on your machine.*
 
-The `Dadb.discover()` and `Dadb.list()` methods now both support USB-connected devices.
+The `Kadb.discover()` and `Kadb.list()` methods now both support USB-connected devices.
 
 ```kotlin
 // Both of these will include any USB-connected devices if they are available
-val dadb = Dadb.discover()
-val dadbs = Dadb.list()
+val kadb = Kadb.discover()
+val kadbs = Kadb.list()
 ```
 
 If you'd like to connect directly to a physical device via its serial number. Use the following API:
 
 ```kotlin
-val dadb = AdbServer.createDadb(
+val kadb = AdbServer.createKadb(
     adbServerHost = "localhost",
     adbServerPort = 5037,
     deviceQuery = "host:transport:${serialNumber}"
@@ -78,21 +78,21 @@ val dadb = AdbServer.createDadb(
 ### Install / Uninstall APK
 
 ```kotlin
-dadb.install(exampleApkFile)
-dadb.uninstall("com.example.app")
+kadb.install(exampleApkFile)
+kadb.uninstall("com.example.app")
 ```
 
 ### Push / Pull Files
 
 ```kotlin
-dadb.push(srcFile, "/data/local/tmp/dst.txt")
-dadb.pull(dstFile, "/data/local/tmp/src.txt")
+kadb.push(srcFile, "/data/local/tmp/dst.txt")
+kadb.pull(dstFile, "/data/local/tmp/src.txt")
 ```
 
 ### Execute Shell Command
 
 ```kotlin
-val response = dadb.shell("echo hello")
+val response = kadb.shell("echo hello")
 assert(response.exitCode == 0)
 assert(response.output == "hello\n")
 ```
@@ -100,7 +100,7 @@ assert(response.output == "hello\n")
 ### TCP Forwarding
 
 ```kotlin
-dadb.tcpForward(
+kadb.tcpForward(
     hostPort = 7001,
     targetPort = 7001
 ).use {

@@ -1,6 +1,6 @@
 package com.flyfishxu.kadb.forwarding
 
-import com.flyfishxu.kadb.Dadb
+import com.flyfishxu.kadb.Kadb
 import com.flyfishxu.kadb.log
 import okio.BufferedSink
 import okio.Source
@@ -18,7 +18,7 @@ import java.util.concurrent.TimeoutException
 import kotlin.concurrent.thread
 
 internal class TcpForwarder(
-    private val dadb: Dadb,
+    private val kadb: Kadb,
     private val hostPort: Int,
     private val targetPort: Int,
 ) : AutoCloseable {
@@ -61,7 +61,7 @@ internal class TcpForwarder(
             val client = serverRef.accept()
 
             clientExecutor?.execute {
-                val adbStream = dadb.open("tcp:$targetPort")
+                val adbStream = kadb.open("tcp:$targetPort")
 
                 val readerThread = thread {
                     forward(

@@ -2,7 +2,7 @@ package com.flyfishxu.kadb.adbserver
 
 import android.util.Log
 import com.flyfishxu.kadb.AdbStream
-import com.flyfishxu.kadb.Dadb
+import com.flyfishxu.kadb.Kadb
 import okio.buffer
 import okio.sink
 import okio.source
@@ -45,15 +45,15 @@ object AdbServer {
      */
     @JvmStatic
     @JvmOverloads
-    fun createDadb(
+    fun createKadb(
         adbServerHost: String = "localhost",
         adbServerPort: Int = 5037,
         deviceQuery: String = "host:transport-any"
-    ): Dadb {
+    ): Kadb {
         val name = deviceQuery
             .removePrefix("host:") // Use the device query without the host: prefix
             .removePrefix("transport:") // If it's a serial-number, just show that
-        return AdbServerDadb(adbServerHost, adbServerPort, deviceQuery, name)
+        return AdbServerKadb(adbServerHost, adbServerPort, deviceQuery, name)
     }
 
     /**
@@ -61,10 +61,10 @@ object AdbServer {
      */
     @JvmStatic
     @JvmOverloads
-    fun listDadbs(
+    fun listKadbs(
         adbServerHost: String = "localhost",
         adbServerPort: Int = 5037,
-    ): List<Dadb> {
+    ): List<Kadb> {
         if (!AdbBinary.tryStartServer(adbServerHost, adbServerPort)) {
             return emptyList()
         }
@@ -82,7 +82,7 @@ object AdbServer {
                     parts[0]
                 }
             }
-            .map { createDadb(adbServerHost, adbServerPort, "host:transport:${it}") }
+            .map { createKadb(adbServerHost, adbServerPort, "host:transport:${it}") }
     }
 
     fun readString(inputStream: DataInputStream): String {
@@ -120,12 +120,12 @@ object AdbServer {
     }
 }
 
-private class AdbServerDadb(
+private class AdbServerKadb(
     private val host: String,
     private val port: Int,
     private val deviceQuery: String,
     private val name: String,
-) : Dadb {
+) : Kadb {
 
     private val supportedFeatures: Set<String>
 

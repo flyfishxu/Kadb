@@ -49,7 +49,6 @@ internal class AdbMessage(
         return "payload[$payloadLength]"
     }
 
-    @Suppress("UsePropertyAccessSyntax")
     private fun shellPayloadStr(): String? {
         val source: BufferedSource = getSource()
         if (source.buffer.size < 5) return null

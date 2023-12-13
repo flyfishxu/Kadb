@@ -17,7 +17,7 @@
 
 package com.flyfishxu.kadb
 
-private val ENABLED = "true" == System.getenv("DADB_LOGGING")
+private val ENABLED = "true" == System.getenv("KADB_LOGGING")
 
 internal fun log(block: () -> String) {
     if (ENABLED) {

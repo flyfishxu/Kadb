@@ -20,11 +20,11 @@ package com.flyfishxu.kadb
 import org.jetbrains.annotations.TestOnly
 import java.net.Socket
 
-internal class DadbImpl(
+internal class KadbImpl(
     private val host: String,
     private val port: Int,
     private val keyPair: AdbKeyPair? = null
-) : Dadb {
+) : Kadb {
 
     private var connection: Pair<AdbConnection, Socket>? = null
 

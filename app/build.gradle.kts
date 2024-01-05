@@ -66,9 +66,7 @@ publishing {
             artifactId = "kadb"
             version = "1.0.0"
 
-            // 上传 AAR 包
             afterEvaluate { artifact(tasks.getByName("bundleReleaseAar")) }
-            // 向 Maven 仓库中上传源码
             artifact(sourceJar)
 
             pom {

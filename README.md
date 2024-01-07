@@ -1,6 +1,14 @@
 # Kadb
 A Kotlin based Android library to connect Android devices directly without ADB binary file.
 
+[![Maven Central](https://img.shields.io/maven-central/v/com.flyfishxu/kadb.svg)](https://mvnrepository.com/artifact/com.flyfishxu/kadb)
+
+```kotlin
+dependencies {
+  implementation("dev.mobile:dadb:<version>")
+}
+```
+
 ## Express Gratitude 
 
 - [Dadb](https://github.com/mobile-dev-inc/dadb): Kadb is based on the second development of Dadb, and we would like to thank mobile-dev-inc for all their previous efforts!

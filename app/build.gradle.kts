@@ -1,3 +1,5 @@
+apply(from = "/Users/flyfishxu/Documents/Develop/publish.gradle.kts")
+
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
@@ -59,6 +61,11 @@ val sourceJar by tasks.registering(Jar::class) {
     from(android.sourceSets["main"].java.srcDirs)
 }
 
+val javadocJar by tasks.registering(Jar::class) {
+    from("javadoc")
+    archiveClassifier.set("javadoc")
+}
+
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
@@ -68,6 +75,7 @@ publishing {
 
             afterEvaluate { artifact(tasks.getByName("bundleReleaseAar")) }
             artifact(sourceJar)
+            artifact(javadocJar)
 
             pom {
                 name.set("Kadb")
@@ -99,6 +107,13 @@ publishing {
     }
 
     repositories {
+        maven {
+            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2")
+            credentials {
+                username = extra["sonatypeUsername"] as String
+                password = extra["sonatypePassword"] as String
+            }
+        }
         mavenLocal()
     }
 }

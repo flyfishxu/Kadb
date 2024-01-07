@@ -26,6 +26,7 @@ import okio.sink
 import okio.source
 import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
+import java.io.File
 import java.io.IOException
 import java.net.Socket
 import java.util.*
@@ -85,6 +86,7 @@ internal class AdbConnection internal constructor(
         fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbConnection {
             val source = socket.source()
             val sink = socket.sink()
+            File("").sink()
 
             return connect(socket, source, sink, keyPair, socket)
         }

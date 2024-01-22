@@ -86,7 +86,6 @@ internal class AdbConnection internal constructor(
         fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbConnection {
             val source = socket.source()
             val sink = socket.sink()
-            File("").sink()
 
             return connect(socket, source, sink, keyPair, socket)
         }

@@ -17,6 +17,7 @@
 
 package com.flyfishxu.kadb
 
+import android.util.Log
 import okio.*
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -41,10 +42,12 @@ class AdbSyncStream(
 
     private val buffer = Buffer()
 
+
     @Throws(IOException::class)
     fun send(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
         val remote = "$remotePath,$mode"
-        writePacket(SEND, remote.length)
+        val length = remote.toByteArray().size
+        writePacket(SEND, length)
 
         stream.sink.apply {
             writeString(remote, StandardCharsets.UTF_8)

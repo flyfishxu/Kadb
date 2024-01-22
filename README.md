@@ -5,7 +5,7 @@ A Kotlin based Android library to connect Android devices directly without ADB b
 
 ```kotlin
 dependencies {
-  implementation("dev.mobile:dadb:<version>")
+  implementation("com.flyfishxu:kadb:<version>")
 }
 ```
 

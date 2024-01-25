@@ -69,7 +69,14 @@ class AdbSyncStream(
         stream.sink.flush()
 
         val packet = readPacket()
-        if (packet.id != OKAY) throw IOException("Unexpected sync packet id: ${packet.id}")
+        when (packet.id) {
+            OKAY -> return
+            FAIL -> {
+                val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
+                throw IOException("Sync failed: $message")
+            }
+            else -> throw IOException("Unexpected sync packet id: ${packet.id}")
+        }
     }
 
     @Throws(IOException::class)
@@ -84,15 +91,19 @@ class AdbSyncStream(
 
         while (true) {
             val packet = readPacket()
-            if (packet.id == DONE) break
-            if (packet.id == FAIL) {
-                val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
-                throw IOException("Sync failed: $message")
+            when (packet.id) {
+                DATA -> {
+                    val chunkSize = packet.arg
+                    stream.source.readFully(buffer, chunkSize.toLong())
+                    buffer.readAll(sink)
+                }
+                DONE -> break
+                FAIL -> {
+                    val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
+                    throw IOException("Sync failed: $message")
+                }
+                else -> throw IOException("Unexpected sync packet id: ${packet.id}")
             }
-            if (packet.id != DATA) throw IOException("Unexpected sync packet id: ${packet.id}")
-            val chunkSize = packet.arg
-            stream.source.readFully(buffer, chunkSize.toLong())
-            buffer.readAll(sink)
         }
 
         sink.flush()

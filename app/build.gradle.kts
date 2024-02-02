@@ -32,10 +32,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 }
 
 dependencies {
@@ -44,7 +40,7 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
 
     implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.20")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.21")
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.70")
     implementation("com.github.MuntashirAkon.spake2-java:android:2.0.0")

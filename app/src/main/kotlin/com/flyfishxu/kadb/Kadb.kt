@@ -131,11 +131,22 @@ interface Kadb : AutoCloseable {
         return AdbSyncStream(stream)
     }
 
+
+
     @Throws(IOException::class)
     fun install(file: File, vararg options: String) {
-        if (supportsFeature("abb_exec")) {
-            abbExec("package", "install", "-S", file.length().toString(), *options).use { stream ->
-                stream.sink.writeAll(file.source())
+        if (supportsFeature("cmd")) {
+            install(file.source(), file.length(), *options)
+        } else {
+            pmInstall(file, *options)
+        }
+    }
+
+    @Throws(IOException::class)
+    fun install(source: Source, size: Long, vararg options: String) {
+        if (supportsFeature("cmd")) {
+            execCmd("package", "install", "-S", size.toString(), *options).use { stream ->
+                stream.sink.writeAll(source)
                 stream.sink.flush()
                 val response = stream.source.readString(Charsets.UTF_8)
                 if (!response.startsWith("Success")) {
@@ -143,11 +154,19 @@ interface Kadb : AutoCloseable {
                 }
             }
         } else {
-            val fileName = file.name
-            val remotePath = "/data/local/tmp/$fileName"
-            push(file, remotePath)
-            shell("pm install ${options.joinToString(" ")} \"$remotePath\"")
+            val tempFile = kotlin.io.path.createTempFile()
+            val fileSink = tempFile.sink().buffer()
+            fileSink.writeAll(source)
+            fileSink.flush()
+            pmInstall(tempFile.toFile(), *options)
         }
+    }
+
+    private fun pmInstall(file: File, vararg options: String) {
+        val fileName = file.name
+        val remotePath = "/data/local/tmp/$fileName"
+        push(file, remotePath)
+        shell("pm install ${options.joinToString(" ")} \"$remotePath\"")
     }
 
     @Throws(IOException::class)
@@ -260,6 +279,13 @@ interface Kadb : AutoCloseable {
         if (response.exitCode != 0) {
             throw IOException("Uninstall failed: ${response.allOutput}")
         }
+    }
+
+    @Throws(IOException::class)
+    fun execCmd(vararg command: String): AdbStream {
+        if (!supportsFeature("cmd")) throw UnsupportedOperationException("cmd is not supported on this version of Android")
+        val destination = (listOf("exec:cmd") + command).joinToString(" ")
+        return open(destination)
     }
 
     @Throws(IOException::class)

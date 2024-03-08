@@ -356,8 +356,8 @@ interface Kadb : AutoCloseable {
 
         @JvmStatic
         @JvmOverloads
-        fun create(host: String, port: Int, keyPair: AdbKeyPair? = read()): Kadb =
-            KadbImpl(host, port, keyPair)
+        fun create(host: String, port: Int, keyPair: AdbKeyPair? = read(), connectTimeout: Int = 0, socketTimeout: Int = 0): Kadb =
+            KadbImpl(host, port, keyPair, connectTimeout, socketTimeout)
 
         @JvmStatic
         @JvmOverloads

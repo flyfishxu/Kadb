@@ -17,7 +17,6 @@
 
 package com.flyfishxu.kadb
 
-import android.util.Log
 import okio.*
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -75,6 +74,7 @@ class AdbSyncStream(
                 val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
                 throw IOException("Sync failed: $message")
             }
+
             else -> throw IOException("Unexpected sync packet id: ${packet.id}")
         }
     }
@@ -97,11 +97,14 @@ class AdbSyncStream(
                     stream.source.readFully(buffer, chunkSize.toLong())
                     buffer.readAll(sink)
                 }
+
                 DONE -> break
                 FAIL -> {
-                    val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
+                    val message =
+                        stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
                     throw IOException("Sync failed: $message")
                 }
+
                 else -> throw IOException("Unexpected sync packet id: ${packet.id}")
             }
         }

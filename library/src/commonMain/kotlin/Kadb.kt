@@ -32,11 +32,6 @@
 
 package com.flyfishxu.kadb
 
-import android.content.Context
-import android.os.Build
-import androidx.annotation.WorkerThread
-import androidx.documentfile.provider.DocumentFile
-import com.flyfishxu.kadb.AdbKeyPair.Companion.getDeviceName
 import com.flyfishxu.kadb.AdbKeyPair.Companion.read
 import com.flyfishxu.kadb.adbserver.AdbServer
 import com.flyfishxu.kadb.forwarding.TcpForwarder
@@ -46,7 +41,6 @@ import kotlinx.coroutines.withContext
 import okio.*
 import java.io.File
 import java.io.IOException
-import java.nio.file.Files
 
 interface Kadb : AutoCloseable {
 
@@ -68,20 +62,6 @@ interface Kadb : AutoCloseable {
         return AdbShellStream(stream)
     }
 
-    @Throws(IOException::class)
-    fun push(
-        src: DocumentFile,
-        remotePath: String,
-        context: Context,
-        mode: Int = readMode(src),
-        lastModifiedMs: Long = src.lastModified()
-    ) {
-        val inputStream = context.contentResolver.openInputStream(src.uri)
-        checkNotNull(inputStream)
-        val source = inputStream.source()
-        push(source, remotePath, mode, lastModifiedMs)
-        inputStream.close()
-    }
 
     @Throws(IOException::class)
     fun push(
@@ -101,19 +81,6 @@ interface Kadb : AutoCloseable {
     }
 
     @Throws(IOException::class)
-    fun pull(
-        dst: DocumentFile,
-        remotePath: String,
-        context: Context
-    ) {
-        val outputStream = context.contentResolver.openOutputStream(dst.uri)
-        checkNotNull(outputStream)
-        val sink = outputStream.sink()
-        pull(sink, remotePath)
-        outputStream.close()
-    }
-
-    @Throws(IOException::class)
     fun pull(dst: File, remotePath: String) {
         pull(dst.sink(append = false), remotePath)
     }
@@ -130,7 +97,6 @@ interface Kadb : AutoCloseable {
         val stream = open("sync:")
         return AdbSyncStream(stream)
     }
-
 
 
     @Throws(IOException::class)
@@ -335,7 +301,6 @@ interface Kadb : AutoCloseable {
          * @return `true` if the pairing is successful and `false` otherwise.
          * @throws Exception If pairing failed for some reason.
          */
-        @WorkerThread
         @Throws(Exception::class)
         suspend fun pair(
             host: String,
@@ -348,7 +313,7 @@ interface Kadb : AutoCloseable {
                 port,
                 pairingCode.toByteArray(Charsets.UTF_8),
                 keyPair,
-                getDeviceName()
+                AdbKeyPair.getDeviceName()
             ).use { pairingClient ->
                 pairingClient.start()
             }
@@ -356,7 +321,13 @@ interface Kadb : AutoCloseable {
 
         @JvmStatic
         @JvmOverloads
-        fun create(host: String, port: Int, keyPair: AdbKeyPair? = read(), connectTimeout: Int = 0, socketTimeout: Int = 0): Kadb =
+        fun create(
+            host: String,
+            port: Int,
+            keyPair: AdbKeyPair? = read(),
+            connectTimeout: Int = 0,
+            socketTimeout: Int = 0
+        ): Kadb =
             KadbImpl(host, port, keyPair, connectTimeout, socketTimeout)
 
         @JvmStatic
@@ -417,31 +388,7 @@ interface Kadb : AutoCloseable {
             }
         }
 
-        private fun readMode(file: File): Int {
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Files.getAttribute(file.toPath(), "unix:mode") as? Int ?: throw RuntimeException(
-                    "Unable to read file mode"
-                )
-            } else {
-                var mode = 0
-                if (file.canRead()) {
-                    mode = mode or 400
-                }
-                if (file.canWrite()) {
-                    mode = mode or 200
-                }
-                if (file.canExecute()) {
-                    mode = mode or 100
-                }
-                mode
-            }
-        }
-
-        private fun readMode(file: DocumentFile): Int {
-            return if (file.canRead()) 400
-            else if (file.canWrite()) 200
-            else 0
-        }
-
     }
 }
+
+expect fun Kadb.readMode(file: File): Int

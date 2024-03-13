@@ -1,6 +1,5 @@
 package com.flyfishxu.kadb.adbserver
 
-import android.util.Log
 import com.flyfishxu.kadb.AdbStream
 import com.flyfishxu.kadb.Kadb
 import okio.buffer
@@ -98,7 +97,6 @@ object AdbServer {
         writeString(outputStream, command)
 
         val response = readString(inputStream)
-        Log.i("Response", response)
         if (response != "OKAY") {
             val error = readString(inputStream)
             throw IOException("Command failed ($command): $error")

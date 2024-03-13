@@ -32,11 +32,9 @@
 
 package com.flyfishxu.kadb
 
-import android.os.Build
 import java.security.KeyFactory
 import java.security.PrivateKey
 import java.security.spec.PKCS8EncodedKeySpec
-import java.util.Base64
 
 object PKCS8 {
 
@@ -50,12 +48,6 @@ object PKCS8 {
         val keySpec = PKCS8EncodedKeySpec(encoded)
         return keyFactory.generatePrivate(keySpec)
     }
-
-    private fun encoding(string: String): ByteArray {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Base64.getDecoder().decode(string)
-        } else {
-            android.util.Base64.decode(string, android.util.Base64.DEFAULT)
-        }
-    }
 }
+
+expect fun PKCS8.encoding(string: String): ByteArray

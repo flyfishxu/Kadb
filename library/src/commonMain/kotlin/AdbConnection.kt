@@ -26,7 +26,6 @@ import okio.sink
 import okio.source
 import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
-import java.io.File
 import java.io.IOException
 import java.net.Socket
 import java.util.*

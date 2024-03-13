@@ -34,7 +34,6 @@ kotlin {
             dependencies {
                 implementation(libs.documentfile)
                 implementation(libs.sun.security.android)
-                // runtimeOnly(libs.conscrypt.android) -> SHOULD ONLY BE USED IN CLIENT SIDE
             }
         }
         val commonTest by getting {

@@ -1,55 +1,51 @@
-apply(from = "/Users/flyfishxu/Documents/Develop/publish.gradle.kts")
-
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
-    id("maven-publish")
-    id("signing")
+    alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.androidLibrary)
+    id("module.publication")
+}
+
+kotlin {
+    kotlin.applyDefaultHierarchyTemplate()
+    jvm()
+    androidTarget {
+        publishLibraryVariants("release")
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
+
+    sourceSets {
+        val androidMain by getting {
+            dependencies {
+                implementation(libs.documentfile)
+                implementation(libs.sun.security.android)
+                implementation(libs.conscrypt.android)
+            }
+        }
+        val commonMain by getting {
+            dependencies {
+                implementation(libs.java)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.bcprov.jdk15on)
+                api(libs.okio)
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(libs.kotlin.test)
+            }
+        }
+    }
 }
 
 android {
     namespace = "com.flyfishxu.kadb"
-    compileSdk = 34
-
-    sourceSets {
-        getByName("main").java.srcDirs("src/main/kotlin")
-    }
-
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
     defaultConfig {
-        minSdk = 23
-        version = 1.0
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        minSdk = libs.versions.android.minSdk.get().toInt()
     }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-}
-
-dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.documentfile:documentfile:1.0.1")
-
-    implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22")
-
-    implementation("org.bouncycastle:bcprov-jdk15on:1.70")
-    implementation("com.github.MuntashirAkon.spake2-java:android:2.0.0")
-    implementation("com.github.MuntashirAkon:sun-security-android:1.1")
-
-    api("com.squareup.okio:okio:3.7.0")
-
-    // Comment out the following line to disable Custom Conscrypt Libs for below Android 9
-    implementation("org.conscrypt:conscrypt-android:2.5.2")
 }
 
 val sourceJar by tasks.registering(Jar::class) {
@@ -61,6 +57,9 @@ val javadocJar by tasks.registering(Jar::class) {
     from("javadoc")
     archiveClassifier.set("javadoc")
 }
+
+// Maven Central Publish Config
+apply(from = "../../../publish.gradle.kts")
 
 publishing {
     publications {

@@ -16,11 +16,7 @@
 
 package com.flyfishxu.kadb
 
-import android.annotation.SuppressLint
-import android.os.Build
-import androidx.annotation.NonNull
 import java.net.Socket
-import java.security.KeyManagementException
 import java.security.NoSuchAlgorithmException
 import java.security.Principal
 import java.security.PrivateKey
@@ -34,7 +30,6 @@ import javax.net.ssl.X509ExtendedKeyManager
 import javax.net.ssl.X509TrustManager
 
 object SslUtils {
-    @JvmField
     var customConscrypt = false
     private var sslContext: SSLContext? = null
 
@@ -54,9 +49,6 @@ object SslUtils {
         return tlsSocket
     }
 
-    @JvmStatic
-    @SuppressLint("TrulyRandom") // The users are already instructed to fix this issue
-    @Throws(NoSuchAlgorithmException::class, KeyManagementException::class)
     fun getSslContext(keyPair: AdbKeyPair): SSLContext {
         sslContext?.let { return it }
         try {
@@ -67,10 +59,12 @@ object SslUtils {
         } catch (e: NoSuchAlgorithmException) {
             throw e
         } catch (e: Throwable) {
+            /** Todo: Need Test
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                // Custom error message to inform user that they should use custom Conscrypt library
-                throw NoSuchAlgorithmException("TLSv1.3 isn't supported on your platform. Use custom Conscrypt library instead.")
+            // Custom error message to inform user that they should use custom Conscrypt library
+            throw NoSuchAlgorithmException("TLSv1.3 isn't supported on your platform. Use custom Conscrypt library instead.")
             }
+             **/
             sslContext = SSLContext.getInstance("TLSv1.3")
             customConscrypt = false
         }
@@ -81,7 +75,6 @@ object SslUtils {
         return sslContext!!
     }
 
-    @NonNull
     private fun getKeyManager(keyPair: AdbKeyPair): KeyManager {
         return object : X509ExtendedKeyManager() {
             private val mAlias = "key"
@@ -129,8 +122,6 @@ object SslUtils {
         }
     }
 
-    @SuppressLint("TrustAllX509TrustManager", "CustomX509TrustManager") // Accept all certificates
-    @NonNull
     private fun getAllAcceptingTrustManager(): X509TrustManager {
         return object : X509TrustManager {
             override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {

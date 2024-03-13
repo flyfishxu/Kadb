@@ -16,17 +16,15 @@
 
 package com.flyfishxu.kadb
 
-import android.content.Context
+object KadbInitializer : ConfigProvider {
+    private var _workDir: String? = null
 
-object KadbInitializer : ContextProvider {
-    private var _applicationContext: Context? = null
-
-    fun initialize(applicationContext: Context) {
-        _applicationContext = applicationContext.applicationContext
+    fun initialize(workDir: String) {
+        _workDir = workDir
     }
 
-    override val ctx: Context
+    override val workDir: String
         get() {
-            return requireNotNull(_applicationContext) { "Library has not been initialized" }
+            return requireNotNull(_workDir) { "Library has not been initialized" }
         }
 }

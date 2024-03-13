@@ -16,10 +16,10 @@
 
 package com.flyfishxu.kadb
 
-import androidx.annotation.VisibleForTesting
 import com.flyfishxu.kadb.pair.ByteArrayNoThrowOutputStream
 import com.flyfishxu.kadb.pair.StringCompat
 import org.bouncycastle.util.encoders.Base64
+import org.jetbrains.annotations.VisibleForTesting
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

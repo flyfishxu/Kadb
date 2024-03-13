@@ -16,12 +16,8 @@
 
 package com.flyfishxu.kadb.pair
 
-import android.annotation.SuppressLint
-import android.os.Build
-import android.util.Log
 import com.flyfishxu.kadb.AdbKeyPair
 import com.flyfishxu.kadb.AndroidPubkey.encodeWithName
-import com.flyfishxu.kadb.SslUtils
 import com.flyfishxu.kadb.SslUtils.getSslContext
 import com.flyfishxu.kadb.pair.PairingAuthCtx.Companion.createAlice
 import java.io.Closeable
@@ -44,7 +40,7 @@ class PairingConnectionCtx(
     deviceName: String
 ) : Closeable {
     private val mHost: String
-    private val mPswd: ByteArray
+    private val mPwd: ByteArray
     private val mPeerInfo: PeerInfo
     private val mSslContext: SSLContext
     private val mRole = Role.Client
@@ -55,7 +51,7 @@ class PairingConnectionCtx(
 
     init {
         mHost = Objects.requireNonNull(host)
-        mPswd = Objects.requireNonNull(pswd)
+        mPwd = Objects.requireNonNull(pswd)
         mPeerInfo = PeerInfo(
             PeerInfo.ADB_RSA_PUB_KEY, encodeWithName(
                 (keyPair.publicKey as RSAPublicKey), Objects.requireNonNull(deviceName)
@@ -105,8 +101,7 @@ class PairingConnectionCtx(
 
     @Throws(IOException::class)
     private fun setupTlsConnection() {
-        val socket: Socket
-        socket = if (mRole == Role.Server) {
+        val socket: Socket = if (mRole == Role.Server) {
             val sslServerSocket =
                 mSslContext.serverSocketFactory.createServerSocket(mPort) as SSLServerSocket
             sslServerSocket.accept()
@@ -119,37 +114,26 @@ class PairingConnectionCtx(
         val sslSocket =
             mSslContext.socketFactory.createSocket(socket, mHost, mPort, true) as SSLSocket
         sslSocket.startHandshake()
-        Log.d(TAG, "Handshake succeeded.")
         mInputStream = DataInputStream(sslSocket.inputStream)
         mOutputStream = DataOutputStream(sslSocket.outputStream)
 
         // To ensure the connection is not stolen while we do the PAKE, append the exported key material from the
         // tls connection to the password.
         val keyMaterial = exportKeyingMaterial(sslSocket, EXPORT_KEY_SIZE)
-        val passwordBytes = ByteArray(mPswd.size + keyMaterial.size)
-        System.arraycopy(mPswd, 0, passwordBytes, 0, mPswd.size)
-        System.arraycopy(keyMaterial, 0, passwordBytes, mPswd.size, keyMaterial.size)
+        val passwordBytes = ByteArray(mPwd.size + keyMaterial.size)
+        System.arraycopy(mPwd, 0, passwordBytes, 0, mPwd.size)
+        System.arraycopy(keyMaterial, 0, passwordBytes, mPwd.size, keyMaterial.size)
         val pairingAuthCtx = createAlice(passwordBytes)
             ?: throw IOException("Unable to create PairingAuthCtx.")
         mPairingAuthCtx = pairingAuthCtx
     }
 
-    @SuppressLint("PrivateApi") // Conscrypt is a stable private API
     @Throws(SSLException::class)
     private fun exportKeyingMaterial(sslSocket: SSLSocket, length: Int): ByteArray {
         // Conscrypt#exportKeyingMaterial(SSLSocket socket, String label, byte[] context, int length): byte[]
         //          throws SSLException
         return try {
-            val conscryptClass: Class<*>
-            conscryptClass = if (SslUtils.customConscrypt) {
-                Class.forName("org.conscrypt.Conscrypt")
-            } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                // Although support for conscrypt has been added in Android 5.0 (Lollipop),
-                // TLS1.3 isn't supported until Android 9 (Pie).
-                throw SSLException("TLSv1.3 isn't supported on your platform. Use custom Conscrypt library instead.")
-            } else {
-                Class.forName("com.android.org.conscrypt.Conscrypt")
-            }
+            val conscryptClass: Class<*> = getConscryptClass()
             val exportKeyingMaterial = conscryptClass.getMethod(
                 "exportKeyingMaterial", SSLSocket::class.java,
                 String::class.java, ByteArray::class.java, Int::class.javaPrimitiveType
@@ -194,11 +178,7 @@ class PairingConnectionCtx(
     }
 
     private fun checkHeaderType(expected: Byte, actual: Byte): Boolean {
-        if (expected != actual) {
-            Log.e(TAG, "Unexpected header type (expected=$expected actual=$actual)")
-            return false
-        }
-        return true
+        return expected == actual
     }
 
     @Throws(IOException::class)
@@ -222,7 +202,6 @@ class PairingConnectionCtx(
         return try {
             mPairingAuthCtx!!.initCipher(theirMsg)
         } catch (e: Exception) {
-            Log.e(TAG, "Unable to initialize pairing cipher")
             throw (IOException().initCause(e) as IOException)
         }
     }
@@ -234,7 +213,6 @@ class PairingConnectionCtx(
         mPeerInfo.writeTo(buffer)
         val outBuffer = mPairingAuthCtx!!.encrypt(buffer.array())
         if (outBuffer == null) {
-            Log.e(TAG, "Failed to encrypt peer info")
             return false
         }
 
@@ -256,27 +234,18 @@ class PairingConnectionCtx(
         mInputStream!!.readFully(theirMsg)
 
         // Try to decrypt the certificate
-        val decryptedMsg = mPairingAuthCtx!!.decrypt(theirMsg)
-        if (decryptedMsg == null) {
-            Log.e(TAG, "Unsupported payload while decrypting peer info.")
-            return false
-        }
+        val decryptedMsg = mPairingAuthCtx!!.decrypt(theirMsg) ?: return false
 
         // The decrypted message should contain the PeerInfo.
         if (decryptedMsg.size != PeerInfo.MAX_PEER_INFO_SIZE) {
-            Log.e(
-                TAG,
-                "Got size=" + decryptedMsg.size + " PeerInfo.size=" + PeerInfo.MAX_PEER_INFO_SIZE
-            )
             return false
         }
         val theirPeerInfo = PeerInfo.readFrom(ByteBuffer.wrap(decryptedMsg))
-        Log.d(TAG, theirPeerInfo.toString())
         return true
     }
 
     override fun close() {
-        Arrays.fill(mPswd, 0.toByte())
+        Arrays.fill(mPwd, 0.toByte())
         try {
             mInputStream!!.close()
         } catch (ignore: IOException) {
@@ -363,19 +332,12 @@ class PairingConnectionCtx(
                 val type = buffer.get()
                 val payload = buffer.getInt()
                 if (version < MIN_SUPPORTED_KEY_HEADER_VERSION || version > MAX_SUPPORTED_KEY_HEADER_VERSION) {
-                    Log.e(
-                        TAG,
-                        "PairingPacketHeader version mismatch (us=" + CURRENT_KEY_HEADER_VERSION
-                                + " them=" + version + ")"
-                    )
                     return null
                 }
                 if (type != SPAKE2_MSG && type != PEER_INFO) {
-                    Log.e(TAG, "Unknown PairingPacket type $type")
                     return null
                 }
                 if (payload <= 0 || payload > MAX_PAYLOAD_SIZE) {
-                    Log.e(TAG, "Header payload not within a safe payload size (size=$payload)")
                     return null
                 }
                 return PairingPacketHeader(version, type, payload)
@@ -384,8 +346,9 @@ class PairingConnectionCtx(
     }
 
     companion object {
-        val TAG = PairingConnectionCtx::class.java.simpleName
         const val EXPORTED_KEY_LABEL = "adb-label\u0000"
         const val EXPORT_KEY_SIZE = 64
     }
 }
+
+expect fun PairingConnectionCtx.getConscryptClass(): Class<*>

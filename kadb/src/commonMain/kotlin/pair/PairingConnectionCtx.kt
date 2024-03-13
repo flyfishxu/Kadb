@@ -240,7 +240,7 @@ class PairingConnectionCtx(
         if (decryptedMsg.size != PeerInfo.MAX_PEER_INFO_SIZE) {
             return false
         }
-        val theirPeerInfo = PeerInfo.readFrom(ByteBuffer.wrap(decryptedMsg))
+        PeerInfo.readFrom(ByteBuffer.wrap(decryptedMsg))
         return true
     }
 

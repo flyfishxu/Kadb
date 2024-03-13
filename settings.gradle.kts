@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Kadb-KMP"
-include(":library")
+include(":kadb")

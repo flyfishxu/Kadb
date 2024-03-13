@@ -1,7 +1,6 @@
 [versions]
 agp = "8.3.0"
 bcprovJdk15on = "1.70"
-conscryptAndroid = "2.5.2"
 spake2Java = "2.0.0"
 kotlin = "1.9.23"
 kotlinxCoroutinesCore = "1.8.0"
@@ -9,12 +8,9 @@ nexus-publish = "2.0.0-rc-1"
 okio = "3.8.0"
 documentfile = "1.0.1"
 sunSecurityAndroid = "1.1"
-android-minSdk = "23"
-android-compileSdk = "34"
 
 [libraries]
 bcprov-jdk15on = { module = "org.bouncycastle:bcprov-jdk15on", version.ref = "bcprovJdk15on" }
-conscrypt-android = { module = "org.conscrypt:conscrypt-android", version.ref = "conscryptAndroid" }
 spake2-java = { module = "com.github.MuntashirAkon.spake2-java:java", version.ref = "spake2Java" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
@@ -22,7 +18,6 @@ nexus-publish = { module = "io.github.gradle-nexus.publish-plugin:io.github.grad
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 sun-security-android = { module = "com.github.MuntashirAkon:sun-security-android", version.ref = "sunSecurityAndroid" }
-
 [plugins]
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

@@ -14,6 +14,9 @@ kotlin {
                 jvmTarget = "17"
             }
         }
+        kotlin {
+            jvmToolchain(17)
+        }
     }
 
     sourceSets {
@@ -21,12 +24,12 @@ kotlin {
             dependencies {
                 implementation(libs.documentfile)
                 implementation(libs.sun.security.android)
-                implementation(libs.conscrypt.android)
+                runtimeOnly(libs.conscrypt.android)
             }
         }
         val commonMain by getting {
             dependencies {
-                implementation(libs.java)
+                implementation(libs.spake2.java)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.bcprov.jdk15on)
                 api(libs.okio)
@@ -38,6 +41,12 @@ kotlin {
             }
         }
     }
+}
+
+allprojects {
+    artifacts
+    group = "com.flyfishxu"
+    version = "1.1.0"
 }
 
 android {
@@ -63,48 +72,39 @@ apply(from = "../../../publish.gradle.kts")
 
 publishing {
     publications {
-        create<MavenPublication>("mavenJava") {
-            groupId = "com.flyfishxu"
-            artifactId = "kadb"
-            version = "1.0.1"
+        publications.configureEach {
+            if (this is MavenPublication) {
+                pom {
+                    name = "Kadb"
+                    description = "A KMP (Kotlin Multiplatform) based CROSS-PLATFORM library for connecting Wlan ADB(Android Debug Bridge) via sockets but without ADB binary file."
+                    url = "https://github.com/flyfishxu/Kadb"
 
-            afterEvaluate { artifact(tasks.getByName("bundleReleaseAar")) }
-            artifact(sourceJar)
-            artifact(javadocJar)
-
-            pom {
-                name.set("Kadb")
-                description.set("Kadb is a Kotlin library for Android Debug Bridge.")
-                url.set("https://github.com/flyfishxu/Kadb")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                    licenses {
+                        license {
+                            name = "The Apache License, Version 2.0"
+                            url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                        }
                     }
-                }
-
-                developers {
-                    developer {
-                        id = "flyfishxu"
-                        name = "Flyfish Xu"
-                        email = "flyfishxu@outlook.com"
+                    developers {
+                        developer {
+                            id = "flyfishxu"
+                            name = "Flyfish Xu"
+                            email = "flyfishxu@outlook.com"
+                        }
                     }
-                }
-
-                scm {
-                    connection.set("scm:git:git://github.com/flyfishxu/Kadb.git")
-                    developerConnection.set("scm:git:ssh://github.com/flyfishxu/Kadb.git")
-                    url.set("https://github.com/flyfishxu/Kadb.git")
+                    scm {
+                        connection = "scm:git:git://github.com/flyfishxu/Kadb.git"
+                        developerConnection = "scm:git:ssh://github.com/flyfishxu/Kadb.git"
+                        url = "https://github.com/flyfishxu/Kadb.git"
+                    }
                 }
             }
         }
     }
-
     repositories {
         maven {
-            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2")
             credentials {
+                url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2")
                 username = extra["sonatypeUsername"] as String
                 password = extra["sonatypePassword"] as String
             }
@@ -115,5 +115,5 @@ publishing {
 
 signing {
     useGpgCmd()
-    sign(publishing.publications.getByName<MavenPublication>("mavenJava"))
+    sign(publishing.publications)
 }

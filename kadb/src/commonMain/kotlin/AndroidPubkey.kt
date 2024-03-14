@@ -18,7 +18,6 @@ package com.flyfishxu.kadb
 
 import com.flyfishxu.kadb.pair.ByteArrayNoThrowOutputStream
 import com.flyfishxu.kadb.pair.StringCompat
-import org.bouncycastle.util.encoders.Base64
 import org.jetbrains.annotations.VisibleForTesting
 import java.math.BigInteger
 import java.nio.ByteBuffer
@@ -26,6 +25,8 @@ import java.nio.ByteOrder
 import java.security.InvalidKeyException
 import java.security.interfaces.RSAPublicKey
 import java.util.Objects
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 internal object AndroidPubkey {
     /**
@@ -83,12 +84,13 @@ internal object AndroidPubkey {
      * @param name      Name without null terminator
      * @return Byte array containing the converted RSAPublicKey object
      */
+    @OptIn(ExperimentalEncodingApi::class)
     @JvmStatic
     @Throws(InvalidKeyException::class)
     fun encodeWithName(publicKey: RSAPublicKey, name: String): ByteArray {
         val pkeySize = 4 * Math.ceil(ANDROID_PUBKEY_ENCODED_SIZE / 3.0).toInt()
         ByteArrayNoThrowOutputStream(pkeySize + name.length + 2).use { bos ->
-            bos.write(Base64.encode(encode(publicKey)))
+            bos.write(Base64.encode(encode(publicKey)).toByteArray())
             bos.write(getUserInfo(name))
             return bos.toByteArray()
         }

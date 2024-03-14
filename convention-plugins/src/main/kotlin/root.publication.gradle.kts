@@ -3,7 +3,7 @@ plugins {
 }
 
 allprojects {
-    group = "com.flyfishxu.kadb"
+    group = "com.flyfishxu"
     version = "0.0.1"
 }
 

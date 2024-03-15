@@ -19,7 +19,6 @@ package com.flyfishxu.kadb.pair
 import com.flyfishxu.kadb.AdbKeyPair
 import com.flyfishxu.kadb.AndroidPubkey.encodeWithName
 import com.flyfishxu.kadb.SslUtils.getSslContext
-import com.flyfishxu.kadb.pair.PairingAuthCtx.Companion.createAlice
 import java.io.Closeable
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -36,7 +35,7 @@ import javax.net.ssl.SSLServerSocket
 import javax.net.ssl.SSLSocket
 
 class PairingConnectionCtx(
-    host: String, private val mPort: Int, pswd: ByteArray, keyPair: AdbKeyPair,
+    host: String, private val mPort: Int, pwd: ByteArray, keyPair: AdbKeyPair,
     deviceName: String
 ) : Closeable {
     private val mHost: String
@@ -51,7 +50,8 @@ class PairingConnectionCtx(
 
     init {
         mHost = Objects.requireNonNull(host)
-        mPwd = Objects.requireNonNull(pswd)
+        mPwd = Objects.requireNonNull(pwd)
+        println(pwd)
         mPeerInfo = PeerInfo(
             PeerInfo.ADB_RSA_PUB_KEY, encodeWithName(
                 (keyPair.publicKey as RSAPublicKey), Objects.requireNonNull(deviceName)
@@ -123,7 +123,7 @@ class PairingConnectionCtx(
         val passwordBytes = ByteArray(mPwd.size + keyMaterial.size)
         System.arraycopy(mPwd, 0, passwordBytes, 0, mPwd.size)
         System.arraycopy(keyMaterial, 0, passwordBytes, mPwd.size, keyMaterial.size)
-        val pairingAuthCtx = createAlice(passwordBytes)
+        val pairingAuthCtx = PairingAuthCtx.createAlice(passwordBytes)
             ?: throw IOException("Unable to create PairingAuthCtx.")
         mPairingAuthCtx = pairingAuthCtx
     }

@@ -29,6 +29,7 @@ import java.nio.ByteOrder
 import java.security.interfaces.RSAPublicKey
 import java.util.Arrays
 import java.util.Objects
+import java.util.logging.Logger
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
 import javax.net.ssl.SSLServerSocket
@@ -51,7 +52,6 @@ class PairingConnectionCtx(
     init {
         mHost = Objects.requireNonNull(host)
         mPwd = Objects.requireNonNull(pwd)
-        println(pwd)
         mPeerInfo = PeerInfo(
             PeerInfo.ADB_RSA_PUB_KEY, encodeWithName(
                 (keyPair.publicKey as RSAPublicKey), Objects.requireNonNull(deviceName)
@@ -211,11 +211,7 @@ class PairingConnectionCtx(
         // Encrypt PeerInfo
         val buffer = ByteBuffer.allocate(PeerInfo.MAX_PEER_INFO_SIZE).order(ByteOrder.BIG_ENDIAN)
         mPeerInfo.writeTo(buffer)
-        val outBuffer = mPairingAuthCtx!!.encrypt(buffer.array())
-        if (outBuffer == null) {
-            return false
-        }
-
+        val outBuffer = mPairingAuthCtx!!.encrypt(buffer.array()) ?: return false
         // Write out the packet header
         val ourHeader = createHeader(PairingPacketHeader.PEER_INFO, outBuffer.size)
         // Write out the encrypted payload

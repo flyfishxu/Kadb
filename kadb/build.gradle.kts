@@ -33,7 +33,7 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation(libs.spake2.android)
+                implementation(libs.spake2.java)
                 implementation(libs.documentfile)
                 implementation(libs.sun.security.android)
             }

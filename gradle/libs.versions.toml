@@ -6,9 +6,10 @@ spake2Android = "2.0.0"
 kotlin = "1.9.23"
 kotlinxCoroutinesCore = "1.8.0"
 nexus-publish = "2.0.0-rc-1"
-okio = "3.8.0"
+okio = "3.9.0"
 documentfile = "1.0.1"
 sunSecurityAndroid = "1.1"
+dokka = "1.9.20"
 
 [libraries]
 bcprov-jdk15on = { module = "org.bouncycastle:bcprov-jdk15on", version.ref = "bcprovJdk15on" }
@@ -23,3 +24,4 @@ sun-security-android = { module = "com.github.MuntashirAkon:sun-security-android
 [plugins]
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

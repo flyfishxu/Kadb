@@ -1,7 +1,7 @@
 [versions]
 agp = "8.3.0"
 bcprovJdk15on = "1.70"
-spake2Java = "2.0.0"
+spake2Java = "0.9.0"
 spake2Android = "2.0.0"
 kotlin = "1.9.23"
 kotlinxCoroutinesCore = "1.8.0"
@@ -14,7 +14,7 @@ dokka = "1.9.20"
 [libraries]
 bcprov-jdk15on = { module = "org.bouncycastle:bcprov-jdk15on", version.ref = "bcprovJdk15on" }
 spake2-android = { module = "com.github.MuntashirAkon.spake2-java:android", version.ref = "spake2Android" }
-spake2-java = { module = "com.github.MuntashirAkon.spake2-java:java", version.ref = "spake2Java" }
+spake2-java = { module = "com.github.MuntashirAkon:spake2-java", version.ref = "spake2Java" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
 nexus-publish = { module = "io.github.gradle-nexus.publish-plugin:io.github.gradle-nexus.publish-plugin.gradle.plugin", version.ref = "nexus-publish" }

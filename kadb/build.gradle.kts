@@ -1,5 +1,3 @@
-import com.android.build.gradle.internal.ide.kmp.KotlinAndroidSourceSetMarker.Companion.android
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
@@ -33,9 +31,14 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation(libs.spake2.java)
+                implementation(libs.spake2.android)
                 implementation(libs.documentfile)
                 implementation(libs.sun.security.android)
+            }
+        }
+        val jvmMain by getting {
+            dependencies {
+                implementation(libs.spake2.java)
             }
         }
         val commonTest by getting {

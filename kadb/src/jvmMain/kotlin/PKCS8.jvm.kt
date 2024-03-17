@@ -1,7 +1,9 @@
 package com.flyfishxu.kadb
 
-import java.util.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
+
+@OptIn(ExperimentalEncodingApi::class)
 actual fun PKCS8.encoding(string: String): ByteArray {
-    return Base64.getDecoder().decode(string)
+    return string.encodeToByteArray()
 }

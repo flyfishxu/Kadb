@@ -1,20 +1,17 @@
 package com.flyfishxu.kadb
 
 import android.os.Build
-import android.sun.misc.BASE64Encoder
 import android.sun.security.provider.X509Factory
 import android.sun.security.x509.*
+import okio.buffer
+import okio.sink
 import java.io.File
-import java.io.FileOutputStream
-import java.nio.charset.StandardCharsets
 import java.security.KeyPairGenerator
-import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.cert.Certificate
 import java.util.*
-
-private const val KEY_BEGIN = "-----BEGIN PRIVATE KEY-----\n"
-private const val KEY_END = "-----END PRIVATE KEY-----"
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 actual fun AdbKeyPair.Companion.generate(
     keySize: Int, subject: String
@@ -59,38 +56,16 @@ actual fun AdbKeyPair.Companion.generate(
     return AdbKeyPair(privateKey, certificate.publicKey, certificate)
 }
 
-actual fun AdbKeyPair.Companion.writePrivateKeyToFile(privateKey: PrivateKey) {
-    val privateKeyFile = File(KadbInitializer.workDir, "adbKey")
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        privateKeyFile.writer().use { out ->
-            val base64 = Base64.getMimeEncoder(64, "\n".toByteArray())
-            out.write(KEY_BEGIN)
-            out.write(base64.encodeToString(privateKey.encoded))
-            out.write(KEY_END)
-        }
-    } else {
-        privateKeyFile.writer().use { out ->
-            val base64 = android.util.Base64.encodeToString(
-                privateKey.encoded, android.util.Base64.DEFAULT
-            )
-            out.write(KEY_BEGIN)
-            out.write(base64)
-            out.write(KEY_END)
-        }
-    }
-}
-
+@OptIn(ExperimentalEncodingApi::class)
 actual fun AdbKeyPair.Companion.writeCertificateToFile(certificate: Certificate) {
     val certFile = File(KadbInitializer.workDir, "cert.pem")
-    val encoder = BASE64Encoder()
 
-    FileOutputStream(certFile).use { os ->
-        os.write(X509Factory.BEGIN_CERT.toByteArray(StandardCharsets.UTF_8))
-        os.write('\n'.code)
-        encoder.encode(certificate.encoded, os)
-        os.write('\n'.code)
-        os.write(X509Factory.END_CERT.toByteArray(StandardCharsets.UTF_8))
+    certFile.sink().buffer().use { os ->
+        os.writeUtf8(X509Factory.BEGIN_CERT)
+        os.writeByte('\n'.code)
+        os.writeUtf8(Base64.encode(certificate.encoded))
+        os.writeByte('\n'.code)
+        os.writeUtf8(X509Factory.END_CERT)
     }
 }
 

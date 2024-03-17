@@ -27,9 +27,7 @@ import java.security.cert.CertificateFactory
 import javax.crypto.Cipher
 
 class AdbKeyPair(
-    val privateKey: PrivateKey,
-    val publicKey: PublicKey,
-    val certificate: Certificate
+    val privateKey: PrivateKey, val publicKey: PublicKey, val certificate: Certificate
 ) {
     internal fun signPayload(message: AdbMessage): ByteArray {
         val cipher = Cipher.getInstance("RSA/ECB/NoPadding")
@@ -50,22 +48,18 @@ class AdbKeyPair(
 
         private fun readPrivateKeyFromFile(): PrivateKey? {
             val privateKeyFile = File(workDir, "adbKey")
-            return try {
-                PKCS8.parse(privateKeyFile.readBytes())
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
+            if (!privateKeyFile.exists()) return null
+            return PKCS8.parse(privateKeyFile.readBytes())
         }
-
-        fun read(): AdbKeyPair {
-            val privateKey = readPrivateKeyFromFile()
-            val certificate = readCertificateFromFile()
-            return if (privateKey == null || certificate == null) generate()
-            else AdbKeyPair(privateKey, certificate.publicKey, certificate)
-        }
-
     }
+
+    fun read(): AdbKeyPair {
+        val privateKey = readPrivateKeyFromFile()
+        val certificate = readCertificateFromFile()
+        return if (privateKey == null || certificate == null) generate()
+        else AdbKeyPair(privateKey, certificate.publicKey, certificate)
+    }
+
 }
 
 
@@ -75,6 +69,5 @@ expect fun AdbKeyPair.Companion.writeCertificateToFile(certificate: Certificate)
 
 expect fun AdbKeyPair.Companion.getDeviceName(): String
 expect fun AdbKeyPair.Companion.generate(
-    keySize: Int = 2048,
-    subject: String = "CN=Kadb"
+    keySize: Int = 2048, subject: String = "CN=Kadb"
 ): AdbKeyPair

@@ -16,6 +16,9 @@
 
 package com.flyfishxu.kadb
 
+import okio.BufferedSink
+import okio.buffer
+import okio.sink
 import java.net.Socket
 import java.security.*
 import java.security.cert.X509Certificate
@@ -28,9 +31,9 @@ object SslUtils {
     fun getSSLSocket(
         socket: Socket, host: String?, port: Int, keyPair: AdbKeyPair?
     ): SSLSocket {
-        val os = socket.getOutputStream()
-        os.write(AdbProtocol.generateStls())
-        os.flush()
+        val sink: BufferedSink = socket.sink().buffer()
+        sink.write(AdbProtocol.generateStls())
+        sink.flush()
         val sslContext = keyPair?.let { getSslContext(it) }
         val tlsSocket = sslContext?.socketFactory?.createSocket(socket, host, port, true) as SSLSocket
         tlsSocket.startHandshake()

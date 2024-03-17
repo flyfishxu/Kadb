@@ -18,6 +18,8 @@ package com.flyfishxu.kadb
 
 import com.flyfishxu.kadb.AndroidPubkey.SIGNATURE_PADDING
 import com.flyfishxu.kadb.KadbInitializer.workDir
+import okio.buffer
+import okio.sink
 import java.io.File
 import java.io.FileInputStream
 import java.security.PrivateKey
@@ -25,6 +27,11 @@ import java.security.PublicKey
 import java.security.cert.Certificate
 import java.security.cert.CertificateFactory
 import javax.crypto.Cipher
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+
+private const val KEY_BEGIN = "-----BEGIN PRIVATE KEY-----\n"
+private const val KEY_END = "-----END PRIVATE KEY-----"
 
 class AdbKeyPair(
     val privateKey: PrivateKey, val publicKey: PublicKey, val certificate: Certificate
@@ -51,19 +58,26 @@ class AdbKeyPair(
             if (!privateKeyFile.exists()) return null
             return PKCS8.parse(privateKeyFile.readBytes())
         }
-    }
 
-    fun read(): AdbKeyPair {
-        val privateKey = readPrivateKeyFromFile()
-        val certificate = readCertificateFromFile()
-        return if (privateKey == null || certificate == null) generate()
-        else AdbKeyPair(privateKey, certificate.publicKey, certificate)
+        internal fun read(): AdbKeyPair {
+            val privateKey = readPrivateKeyFromFile()
+            val certificate = readCertificateFromFile()
+            return if (privateKey == null || certificate == null) generate()
+            else AdbKeyPair(privateKey, certificate.publicKey, certificate)
+        }
     }
-
 }
 
+@OptIn(ExperimentalEncodingApi::class)
+fun AdbKeyPair.Companion.writePrivateKeyToFile(privateKey: PrivateKey) {
+    val privateKeyFile = File(workDir, "adbKey")
 
-expect fun AdbKeyPair.Companion.writePrivateKeyToFile(privateKey: PrivateKey)
+    privateKeyFile.sink().buffer().use { sink ->
+        sink.writeUtf8(KEY_BEGIN)
+        sink.writeUtf8(Base64.encode(privateKey.encoded))
+        sink.writeUtf8(KEY_END)
+    }
+}
 
 expect fun AdbKeyPair.Companion.writeCertificateToFile(certificate: Certificate)
 

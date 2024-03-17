@@ -5,10 +5,6 @@ import java.security.PrivateKey
 import java.security.cert.Certificate
 import java.util.Base64
 
-actual fun AdbKeyPair.Companion.generate(): AdbKeyPair {
-    TODO("Not yet implemented")
-}
-
 actual fun AdbKeyPair.Companion.writePrivateKeyToFile(privateKey: PrivateKey) {
     val privateKeyFile = File(KadbInitializer.workDir, "adbKey")
 
@@ -24,5 +20,12 @@ actual fun AdbKeyPair.Companion.writeCertificateToFile(certificate: Certificate)
 }
 
 actual fun AdbKeyPair.Companion.getDeviceName(): String {
+    TODO("Not yet implemented")
+}
+
+actual fun AdbKeyPair.Companion.generate(
+    keySize: Int,
+    subject: String
+): AdbKeyPair {
     TODO("Not yet implemented")
 }

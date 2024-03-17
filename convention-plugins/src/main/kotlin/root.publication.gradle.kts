@@ -4,7 +4,7 @@ plugins {
 
 allprojects {
     group = "com.flyfishxu"
-    version = "1.1.3"
+    version = "1.1.4"
 }
 
 nexusPublishing {

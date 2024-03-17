@@ -3,21 +3,7 @@ package com.flyfishxu.kadb
 import android.os.Build
 import android.sun.misc.BASE64Encoder
 import android.sun.security.provider.X509Factory
-import android.sun.security.x509.AlgorithmId
-import android.sun.security.x509.CertificateAlgorithmId
-import android.sun.security.x509.CertificateExtensions
-import android.sun.security.x509.CertificateIssuerName
-import android.sun.security.x509.CertificateSerialNumber
-import android.sun.security.x509.CertificateSubjectName
-import android.sun.security.x509.CertificateValidity
-import android.sun.security.x509.CertificateVersion
-import android.sun.security.x509.CertificateX509Key
-import android.sun.security.x509.KeyIdentifier
-import android.sun.security.x509.PrivateKeyUsageExtension
-import android.sun.security.x509.SubjectKeyIdentifierExtension
-import android.sun.security.x509.X500Name
-import android.sun.security.x509.X509CertImpl
-import android.sun.security.x509.X509CertInfo
+import android.sun.security.x509.*
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
@@ -25,27 +11,28 @@ import java.security.KeyPairGenerator
 import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.cert.Certificate
-import java.util.Base64
-import java.util.Date
-import java.util.Random
+import java.util.*
 
-actual fun AdbKeyPair.Companion.generate(): AdbKeyPair {
-    // Generate a new key pair
-    val keySize = 2048
+private const val KEY_BEGIN = "-----BEGIN PRIVATE KEY-----\n"
+private const val KEY_END = "-----END PRIVATE KEY-----"
+
+actual fun AdbKeyPair.Companion.generate(
+    keySize: Int, subject: String
+
+): AdbKeyPair {
+    // For generating a new key pair
     val keyPairGenerator = KeyPairGenerator.getInstance("RSA")
     keyPairGenerator.initialize(keySize, SecureRandom.getInstance("SHA1PRNG"))
     val generateKeyPair = keyPairGenerator.generateKeyPair()
     val publicKey = generateKeyPair.public
     val privateKey = generateKeyPair.private
     // Generate a new certificate
-    val subject = "CN=WearOS Toolbox"
     val algorithmName = "SHA512withRSA"
     val expiryDate = System.currentTimeMillis() + 86400000
     val certificateExtensions = CertificateExtensions()
-    certificateExtensions["SubjectKeyIdentifier"] =
-        SubjectKeyIdentifierExtension(
-            KeyIdentifier(publicKey).identifier
-        )
+    certificateExtensions["SubjectKeyIdentifier"] = SubjectKeyIdentifierExtension(
+        KeyIdentifier(publicKey).identifier
+    )
     val x500Name = X500Name(subject)
     val notBefore = Date()
     val notAfter = Date(expiryDate)
@@ -66,7 +53,7 @@ actual fun AdbKeyPair.Companion.generate(): AdbKeyPair {
     x509CertInfo["extensions"] = certificateExtensions
     val certificate = X509CertImpl(x509CertInfo)
     certificate.sign(privateKey, algorithmName)
-    // Write files
+    // Write to files
     writePrivateKeyToFile(privateKey)
     writeCertificateToFile(certificate)
     return AdbKeyPair(privateKey, certificate.publicKey, certificate)
@@ -78,18 +65,18 @@ actual fun AdbKeyPair.Companion.writePrivateKeyToFile(privateKey: PrivateKey) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         privateKeyFile.writer().use { out ->
             val base64 = Base64.getMimeEncoder(64, "\n".toByteArray())
-            out.write("-----BEGIN PRIVATE KEY-----\n")
+            out.write(KEY_BEGIN)
             out.write(base64.encodeToString(privateKey.encoded))
-            out.write("\n-----END PRIVATE KEY-----")
+            out.write(KEY_END)
         }
     } else {
         privateKeyFile.writer().use { out ->
             val base64 = android.util.Base64.encodeToString(
                 privateKey.encoded, android.util.Base64.DEFAULT
             )
-            out.write("-----BEGIN PRIVATE KEY-----\n")
+            out.write(KEY_BEGIN)
             out.write(base64)
-            out.write("\n-----END PRIVATE KEY-----")
+            out.write(KEY_END)
         }
     }
 }
@@ -107,6 +94,7 @@ actual fun AdbKeyPair.Companion.writeCertificateToFile(certificate: Certificate)
     }
 }
 
+// TODO: DO NOT HARD CODE THE DEVICE NAME
 actual fun AdbKeyPair.Companion.getDeviceName(): String {
     return "${Build.MODEL.replace(" ", "")}@Kadb"
 }

@@ -17,34 +17,22 @@
 package com.flyfishxu.kadb
 
 import java.net.Socket
-import java.security.NoSuchAlgorithmException
-import java.security.Principal
-import java.security.PrivateKey
-import java.security.Provider
-import java.security.SecureRandom
+import java.security.*
 import java.security.cert.X509Certificate
-import javax.net.ssl.KeyManager
-import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLSocket
-import javax.net.ssl.X509ExtendedKeyManager
-import javax.net.ssl.X509TrustManager
+import javax.net.ssl.*
 
 object SslUtils {
     var customConscrypt = false
     private var sslContext: SSLContext? = null
 
     fun getSSLSocket(
-        socket: Socket,
-        host: String?,
-        port: Int,
-        keyPair: AdbKeyPair?
+        socket: Socket, host: String?, port: Int, keyPair: AdbKeyPair?
     ): SSLSocket {
         val os = socket.getOutputStream()
         os.write(AdbProtocol.generateStls())
         os.flush()
         val sslContext = keyPair?.let { getSslContext(it) }
-        val tlsSocket = sslContext?.socketFactory
-            ?.createSocket(socket, host, port, true) as SSLSocket
+        val tlsSocket = sslContext?.socketFactory?.createSocket(socket, host, port, true) as SSLSocket
         tlsSocket.startHandshake()
         return tlsSocket
     }
@@ -59,16 +47,16 @@ object SslUtils {
         } catch (e: NoSuchAlgorithmException) {
             throw e
         } catch (e: Throwable) {
-            /** Todo: Need Test
+            /** TODO: MAKE THIS `EXPECT` -> see (PairingConnectionCtx.android.kt)
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            // Custom error message to inform user that they should use custom Conscrypt library
+            // Although support for conscrypt has been added in Android 5.0 (Lollipop),
+            // TLS1.3 isn't supported until Android 9 (Pie).
             throw NoSuchAlgorithmException("TLSv1.3 isn't supported on your platform. Use custom Conscrypt library instead.")
             }
              **/
             sslContext = SSLContext.getInstance("TLSv1.3")
             customConscrypt = false
         }
-        println("Using " + (if (customConscrypt) "custom" else "default") + " TLSv1.3 provider...")
         sslContext!!.init(
             arrayOf(getKeyManager(keyPair)), arrayOf(getAllAcceptingTrustManager()), SecureRandom()
         )

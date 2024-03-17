@@ -30,8 +30,12 @@ import javax.crypto.Cipher
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-private const val KEY_BEGIN = "-----BEGIN PRIVATE KEY-----\n"
+private const val KEY_BEGIN = "-----BEGIN PRIVATE KEY-----"
 private const val KEY_END = "-----END PRIVATE KEY-----"
+
+private const val CERT_BEGIN = "-----BEGIN CERTIFICATE-----"
+private const val CERT_END = "-----END CERTIFICATE-----"
+
 
 class AdbKeyPair(
     val privateKey: PrivateKey, val publicKey: PublicKey, val certificate: Certificate
@@ -72,14 +76,29 @@ class AdbKeyPair(
 fun AdbKeyPair.Companion.writePrivateKeyToFile(privateKey: PrivateKey) {
     val privateKeyFile = File(workDir, "adbKey")
 
+    // TODO: USE "-----BEGIN PRIVATE KEY-----\n" or add a WriteByte as now on? Which prettier or performance?
+
     privateKeyFile.sink().buffer().use { sink ->
         sink.writeUtf8(KEY_BEGIN)
+        sink.writeByte('\n'.code)
         sink.writeUtf8(Base64.encode(privateKey.encoded))
+        sink.writeByte('\n'.code)
         sink.writeUtf8(KEY_END)
     }
 }
 
-expect fun AdbKeyPair.Companion.writeCertificateToFile(certificate: Certificate)
+@OptIn(ExperimentalEncodingApi::class)
+fun AdbKeyPair.Companion.writeCertificateToFile(certificate: Certificate) {
+    val certFile = File(workDir, "cert.pem")
+
+    certFile.sink().buffer().use { sink ->
+        sink.writeUtf8(CERT_BEGIN)
+        sink.writeByte('\n'.code)
+        sink.writeUtf8(Base64.encode(certificate.encoded))
+        sink.writeByte('\n'.code)
+        sink.writeUtf8(CERT_END)
+    }
+}
 
 expect fun AdbKeyPair.Companion.getDeviceName(): String
 expect fun AdbKeyPair.Companion.generate(

@@ -88,6 +88,7 @@ internal object AndroidPubkey {
     @OptIn(ExperimentalEncodingApi::class)
     @JvmStatic
     @Throws(InvalidKeyException::class)
+    // TODO: REWRITE THIS FUNCTION IN OKIO
     fun encodeWithName(publicKey: RSAPublicKey, name: String): ByteArray {
         val pkeySize = 4 * ceil(ANDROID_PUBKEY_ENCODED_SIZE / 3.0).toInt()
         ByteArrayNoThrowOutputStream(pkeySize + name.length + 2).use { bos ->

@@ -56,19 +56,6 @@ actual fun AdbKeyPair.Companion.generate(
     return AdbKeyPair(privateKey, certificate.publicKey, certificate)
 }
 
-@OptIn(ExperimentalEncodingApi::class)
-actual fun AdbKeyPair.Companion.writeCertificateToFile(certificate: Certificate) {
-    val certFile = File(KadbInitializer.workDir, "cert.pem")
-
-    certFile.sink().buffer().use { os ->
-        os.writeUtf8(X509Factory.BEGIN_CERT)
-        os.writeByte('\n'.code)
-        os.writeUtf8(Base64.encode(certificate.encoded))
-        os.writeByte('\n'.code)
-        os.writeUtf8(X509Factory.END_CERT)
-    }
-}
-
 // TODO: DO NOT HARD CODE THE DEVICE NAME
 actual fun AdbKeyPair.Companion.getDeviceName(): String {
     return "${Build.MODEL.replace(" ", "")}@Kadb"

@@ -27,9 +27,7 @@ import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.interfaces.RSAPublicKey
-import java.util.Arrays
-import java.util.Objects
-import java.util.logging.Logger
+import java.util.*
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
 import javax.net.ssl.SSLServerSocket
@@ -39,26 +37,19 @@ class PairingConnectionCtx(
     host: String, private val mPort: Int, pwd: ByteArray, keyPair: AdbKeyPair,
     deviceName: String
 ) : Closeable {
-    private val mHost: String
-    private val mPwd: ByteArray
-    private val mPeerInfo: PeerInfo
-    private val mSslContext: SSLContext
+    private val mHost: String = Objects.requireNonNull(host)
+    private val mPwd: ByteArray = Objects.requireNonNull(pwd)
+    private val mPeerInfo: PeerInfo = PeerInfo(
+        PeerInfo.ADB_RSA_PUB_KEY, encodeWithName(
+            (keyPair.publicKey as RSAPublicKey), Objects.requireNonNull(deviceName)
+        )
+    )
+    private val mSslContext: SSLContext = getSslContext(keyPair)
     private val mRole = Role.Client
     private var mInputStream: DataInputStream? = null
     private var mOutputStream: DataOutputStream? = null
     private var mPairingAuthCtx: PairingAuthCtx? = null
     private var mState = State.Ready
-
-    init {
-        mHost = Objects.requireNonNull(host)
-        mPwd = Objects.requireNonNull(pwd)
-        mPeerInfo = PeerInfo(
-            PeerInfo.ADB_RSA_PUB_KEY, encodeWithName(
-                (keyPair.publicKey as RSAPublicKey), Objects.requireNonNull(deviceName)
-            )
-        )
-        mSslContext = getSslContext(keyPair)
-    }
 
     @Throws(IOException::class)
     fun start() {
@@ -117,8 +108,8 @@ class PairingConnectionCtx(
         mInputStream = DataInputStream(sslSocket.inputStream)
         mOutputStream = DataOutputStream(sslSocket.outputStream)
 
-        // To ensure the connection is not stolen while we do the PAKE, append the exported key material from the
-        // tls connection to the password.
+        // To ensure the connection is not stolen while we do the PAKE,
+        // append the exported key material from the TLS connection to the password.
         val keyMaterial = exportKeyingMaterial(sslSocket, EXPORT_KEY_SIZE)
         val passwordBytes = ByteArray(mPwd.size + keyMaterial.size)
         System.arraycopy(mPwd, 0, passwordBytes, 0, mPwd.size)
@@ -271,7 +262,7 @@ class PairingConnectionCtx(
         private val data = ByteArray(MAX_PEER_INFO_SIZE - 1)
 
         init {
-            System.arraycopy(data, 0, this.data, 0, Math.min(data.size, MAX_PEER_INFO_SIZE - 1))
+            System.arraycopy(data, 0, this.data, 0, data.size.coerceAtMost(MAX_PEER_INFO_SIZE - 1))
         }
 
         fun writeTo(buffer: ByteBuffer) {
@@ -281,7 +272,7 @@ class PairingConnectionCtx(
         override fun toString(): String {
             return "PeerInfo{" +
                     "type=" + type +
-                    ", data=" + Arrays.toString(data) +
+                    ", data=" + data.contentToString() +
                     '}'
         }
 

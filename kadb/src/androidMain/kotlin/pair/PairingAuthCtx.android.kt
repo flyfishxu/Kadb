@@ -12,10 +12,10 @@ import org.bouncycastle.crypto.params.HKDFParameters
 import org.bouncycastle.crypto.params.KeyParameter
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.Arrays
+import java.util.*
 import javax.security.auth.Destroyable
 
-actual class PairingAuthCtx (
+actual class PairingAuthCtx(
     private val mSpake2Ctx: Spake2Context,
     password: ByteArray
 ) : Destroyable {

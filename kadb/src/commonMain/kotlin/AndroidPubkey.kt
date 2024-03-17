@@ -16,8 +16,8 @@
 
 package com.flyfishxu.kadb
 
-import com.flyfishxu.kadb.pair.ByteArrayNoThrowOutputStream
 import com.flyfishxu.kadb.pair.StringCompat
+import okio.Buffer
 import org.jetbrains.annotations.VisibleForTesting
 import java.math.BigInteger
 import java.nio.ByteBuffer
@@ -87,15 +87,14 @@ internal object AndroidPubkey {
      */
     @OptIn(ExperimentalEncodingApi::class)
     @JvmStatic
-    @Throws(InvalidKeyException::class)
-    // TODO: REWRITE THIS FUNCTION IN OKIO
+    // @Throws(InvalidKeyException::class)
     fun encodeWithName(publicKey: RSAPublicKey, name: String): ByteArray {
         val pkeySize = 4 * ceil(ANDROID_PUBKEY_ENCODED_SIZE / 3.0).toInt()
-        ByteArrayNoThrowOutputStream(pkeySize + name.length + 2).use { bos ->
-            bos.write(Base64.encode(encode(publicKey)).toByteArray())
-            bos.write(getUserInfo(name))
-            return bos.toByteArray()
+        val buffer = Buffer().use {
+            it.write(Base64.encode(encode(publicKey)).toByteArray())
+            it.write(getUserInfo(name))
         }
+        return buffer.readByteArray((pkeySize + name.length + 2).toLong())
     }
 
     // Taken from get_user_info except that a custom name is used instead of host@user

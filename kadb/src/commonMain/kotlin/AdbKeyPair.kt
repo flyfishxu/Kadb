@@ -68,10 +68,13 @@ class AdbKeyPair(
     }
 }
 
-expect fun AdbKeyPair.Companion.generate(): AdbKeyPair
 
 expect fun AdbKeyPair.Companion.writePrivateKeyToFile(privateKey: PrivateKey)
 
 expect fun AdbKeyPair.Companion.writeCertificateToFile(certificate: Certificate)
 
 expect fun AdbKeyPair.Companion.getDeviceName(): String
+expect fun AdbKeyPair.Companion.generate(
+    keySize: Int = 2048,
+    subject: String = "CN=Kadb"
+): AdbKeyPair

@@ -24,9 +24,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.InvalidKeyException
 import java.security.interfaces.RSAPublicKey
-import java.util.Objects
+import java.util.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.math.ceil
 
 internal object AndroidPubkey {
     /**
@@ -88,7 +89,7 @@ internal object AndroidPubkey {
     @JvmStatic
     @Throws(InvalidKeyException::class)
     fun encodeWithName(publicKey: RSAPublicKey, name: String): ByteArray {
-        val pkeySize = 4 * Math.ceil(ANDROID_PUBKEY_ENCODED_SIZE / 3.0).toInt()
+        val pkeySize = 4 * ceil(ANDROID_PUBKEY_ENCODED_SIZE / 3.0).toInt()
         ByteArrayNoThrowOutputStream(pkeySize + name.length + 2).use { bos ->
             bos.write(Base64.encode(encode(publicKey)).toByteArray())
             bos.write(getUserInfo(name))
@@ -165,9 +166,9 @@ internal object AndroidPubkey {
         return out
     }
 
-    private fun fitsInBytes(bytes: ByteArray, num_bytes: Int, len: Int): Boolean {
+    private fun fitsInBytes(bytes: ByteArray, numBytes: Int, len: Int): Boolean {
         var mask: Byte = 0
-        for (i in len until num_bytes) {
+        for (i in len until numBytes) {
             mask = (mask.toInt() or bytes[i].toInt()).toByte()
         }
         return mask.toInt() == 0

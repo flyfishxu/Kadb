@@ -1,11 +1,8 @@
 package com.flyfishxu.kadb
 
 actual fun AdbKeyPair.Companion.getDeviceName(): String {
-    TODO("Not yet implemented")
-}
+    val userName = System.getProperty("user.name")
+    val hostName = System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME") ?: "unknown"
 
-actual fun AdbKeyPair.Companion.generate(
-    keySize: Int, subject: String
-): AdbKeyPair {
-    TODO("Not yet implemented")
+    return "$userName@$hostName@Kadb"
 }

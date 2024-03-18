@@ -25,6 +25,7 @@ expect class PairingAuthCtx : Destroyable {
     fun decrypt(`in`: ByteArray): ByteArray?
     override fun isDestroyed(): Boolean
     override fun destroy()
+
     companion object
 
 

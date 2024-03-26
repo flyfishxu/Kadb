@@ -12,22 +12,18 @@ import org.bouncycastle.crypto.params.HKDFParameters
 import org.bouncycastle.crypto.params.KeyParameter
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.Arrays
+import java.util.*
 import javax.security.auth.Destroyable
 
-actual class PairingAuthCtx (
+actual class PairingAuthCtx(
     private val mSpake2Ctx: Spake2Context,
     password: ByteArray
 ) : Destroyable {
-    actual val msg: ByteArray
+    actual val msg: ByteArray = mSpake2Ctx.generateMessage(password)
     private val mSecretKey = ByteArray(HKDF_KEY_LENGTH)
     private var mDecIv: Long = 0
     private var mEncIv: Long = 0
     private var mIsDestroyed = false
-
-    init {
-        msg = mSpake2Ctx.generateMessage(password)
-    }
 
     actual fun initCipher(theirMsg: ByteArray?): Boolean {
         if (mIsDestroyed) return false

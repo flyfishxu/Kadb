@@ -319,6 +319,25 @@ interface Kadb : AutoCloseable {
             }
         }
 
+        @Throws(Exception::class)
+        suspend fun pair(
+            host: String,
+            port: Int,
+            pairingCode: String,
+            name: String
+        ) = withContext(Dispatchers.Default) {
+            val keyPair = read()
+            PairingConnectionCtx(
+                host,
+                port,
+                pairingCode.toByteArray(Charsets.UTF_8),
+                keyPair,
+                name
+            ).use { pairingClient ->
+                pairingClient.start()
+            }
+        }
+
         @JvmStatic
         @JvmOverloads
         fun create(

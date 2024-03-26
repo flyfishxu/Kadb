@@ -19,8 +19,7 @@ package com.flyfishxu.kadb
 
 import com.flyfishxu.kadb.exception.AdbStreamClosed
 import org.jetbrains.annotations.TestOnly
-import java.util.Collections
-import java.util.Queue
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.locks.ReentrantLock

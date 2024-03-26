@@ -3,7 +3,7 @@ package com.flyfishxu.kadb.adbserver
 import java.io.File
 import java.io.IOException
 import java.net.Socket
-import java.util.Locale
+import java.util.*
 
 internal object AdbBinary {
 

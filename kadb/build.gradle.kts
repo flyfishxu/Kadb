@@ -30,7 +30,8 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.bcprov.jdk15on)
+                implementation(libs.bcprov)
+                implementation(libs.bcpkix)
                 api(libs.okio)
             }
         }
@@ -38,7 +39,12 @@ kotlin {
             dependencies {
                 implementation(libs.spake2.android)
                 implementation(libs.documentfile)
-                implementation(libs.sun.security.android)
+            }
+        }
+        val jvmMain by getting {
+            dependencies {
+                implementation(libs.spake2.java)
+                implementation(libs.jmdns)
             }
         }
         val commonTest by getting {

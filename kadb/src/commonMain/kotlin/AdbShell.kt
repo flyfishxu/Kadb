@@ -17,9 +17,7 @@
 
 package com.flyfishxu.kadb
 
-import com.flyfishxu.kadb.AdbShellPacket.Exit
-import com.flyfishxu.kadb.AdbShellPacket.StdError
-import com.flyfishxu.kadb.AdbShellPacket.StdOut
+import com.flyfishxu.kadb.AdbShellPacket.*
 import java.io.IOException
 
 const val ID_STDIN = 0
@@ -49,6 +47,10 @@ class AdbShellStream(
 
                 is StdError -> {
                     errorOutput.append(String(packet.payload))
+                }
+
+                else -> {
+                    throw IllegalStateException("Unexpected shell packet: $packet")
                 }
             }
         }

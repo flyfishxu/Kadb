@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- */
-/*
+ *//*
  * Copyright (c) 2024 Flyfish-Xu
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,19 +34,20 @@ package com.flyfishxu.kadb
 import java.security.KeyFactory
 import java.security.PrivateKey
 import java.security.spec.PKCS8EncodedKeySpec
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 object PKCS8 {
 
     private const val PREFIX = "-----BEGIN PRIVATE KEY-----"
     private const val SUFFIX = "-----END PRIVATE KEY-----"
 
+    @OptIn(ExperimentalEncodingApi::class)
     fun parse(bytes: ByteArray): PrivateKey {
         val string = String(bytes).replace(PREFIX, "").replace(SUFFIX, "").replace("\n", "")
-        val encoded = encoding(string)
+        val encoded = Base64.decode(string)
         val keyFactory = KeyFactory.getInstance("RSA")
         val keySpec = PKCS8EncodedKeySpec(encoded)
         return keyFactory.generatePrivate(keySpec)
     }
 }
-
-expect fun PKCS8.encoding(string: String): ByteArray

@@ -1,5 +1,3 @@
-import com.android.build.gradle.internal.ide.kmp.KotlinAndroidSourceSetMarker.Companion.android
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
@@ -24,6 +22,11 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
+        val jvmMain by getting {
+            dependencies {
+                implementation(libs.spake2.java)
+            }
+        }
         val commonMain by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.core)
@@ -33,7 +36,7 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation(libs.spake2.java)
+                implementation(libs.spake2.android)
                 implementation(libs.documentfile)
                 implementation(libs.sun.security.android)
             }

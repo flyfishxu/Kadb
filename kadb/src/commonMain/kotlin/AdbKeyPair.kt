@@ -17,26 +17,15 @@
 package com.flyfishxu.kadb
 
 import com.flyfishxu.kadb.AndroidPubkey.SIGNATURE_PADDING
-import com.flyfishxu.kadb.KadbInitializer.workDir
-import okio.buffer
-import okio.sink
-import org.bouncycastle.asn1.x500.X500Name
-import org.bouncycastle.asn1.x509.Time
-import org.bouncycastle.cert.X509v3CertificateBuilder
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
-import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
-import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
-import java.io.File
+import com.flyfishxu.kadb.KadbInitializer.certificate
+import com.flyfishxu.kadb.KadbInitializer.privateKey
 import java.io.FileInputStream
-import java.math.BigInteger
-import java.security.*
+import java.io.IOException
+import java.security.PrivateKey
+import java.security.PublicKey
 import java.security.cert.Certificate
 import java.security.cert.CertificateFactory
-import java.util.*
 import javax.crypto.Cipher
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 private const val KEY_BEGIN = "-----BEGIN PRIVATE KEY-----"
 private const val KEY_END = "-----END PRIVATE KEY-----"
@@ -58,29 +47,29 @@ class AdbKeyPair(
     companion object {
 
         private fun readCertificateFromFile(): Certificate? {
-            // TODO: DO NOT HARD CODE CERT FILE
-            val certFile = File(workDir, "cert.pem")
-            if (!certFile.exists()) return null
-            FileInputStream(certFile).use { cert ->
+            if (!certificate.exists()) return null
+            FileInputStream(certificate).use { cert ->
                 return CertificateFactory.getInstance("X.509").generateCertificate(cert)
             }
         }
 
         private fun readPrivateKeyFromFile(): PrivateKey? {
-            val privateKeyFile = File(workDir, "adbKey")
-            if (!privateKeyFile.exists()) return null
-            return PKCS8.parse(privateKeyFile.readBytes())
+            if (!privateKey.exists()) return null
+            return PKCS8.parse(privateKey.readBytes())
         }
 
         internal fun read(): AdbKeyPair {
             val privateKey = readPrivateKeyFromFile()
             val certificate = readCertificateFromFile()
-            return if (privateKey == null || certificate == null) generate()
+            return if (privateKey == null || certificate == null) throw IOException("Failed to read from file")
             else AdbKeyPair(privateKey, certificate.publicKey, certificate)
         }
     }
 }
 
+
+// TODO: Generate cert and privateKey need rewrite
+/**
 @OptIn(ExperimentalEncodingApi::class)
 fun AdbKeyPair.Companion.writePrivateKeyToFile(privateKey: PrivateKey) {
     val privateKeyFile = File(workDir, "adbKey")
@@ -148,5 +137,5 @@ fun AdbKeyPair.Companion.generate(
     return AdbKeyPair(privateKey, publicKey, certificate)
 }
 
-
+*/
 expect fun AdbKeyPair.Companion.getDeviceName(): String

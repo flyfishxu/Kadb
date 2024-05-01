@@ -67,7 +67,7 @@ publishing {
         create<MavenPublication>("mavenJava") {
             groupId = "com.flyfishxu"
             artifactId = "kadb"
-            version = "1.0.1"
+            version = "1.0.2"
 
             afterEvaluate { artifact(tasks.getByName("bundleReleaseAar")) }
             artifact(sourceJar)

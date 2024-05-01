@@ -22,11 +22,6 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
-        val jvmMain by getting {
-            dependencies {
-                implementation(libs.spake2.java)
-            }
-        }
         val commonMain by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.core)

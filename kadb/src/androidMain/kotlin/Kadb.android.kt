@@ -34,6 +34,16 @@ fun Kadb.push(
     inputStream.close()
 }
 
+fun Kadb.install(
+    src: DocumentFile,
+    context: Context
+) {
+    val inputStream = context.contentResolver.openInputStream(src.uri)
+    checkNotNull(inputStream)
+    val source = inputStream.source()
+    install(source, src.length())
+}
+
 fun Kadb.readMode(file: DocumentFile): Int {
     return if (file.canRead()) 400
     else if (file.canWrite()) 200

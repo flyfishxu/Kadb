@@ -10,11 +10,11 @@ actual class PairingAuthCtx : Destroyable {
     actual val msg: ByteArray
         get() = TODO("Not yet implemented")
 
-    actual fun encrypt(`in`: ByteArray): ByteArray? {
+    actual fun encrypt(input: ByteArray): ByteArray? {
         TODO("Not yet implemented")
     }
 
-    actual fun decrypt(`in`: ByteArray): ByteArray? {
+    actual fun decrypt(input: ByteArray): ByteArray? {
         TODO("Not yet implemented")
     }
 

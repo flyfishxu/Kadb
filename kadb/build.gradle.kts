@@ -9,8 +9,8 @@ kotlin {
         kotlin {
             sourceSets.all {
                 languageSettings {
-                    languageVersion = "2.0"
-                    apiVersion = "2.0"
+                    // languageVersion = "2.0"
+                    // apiVersion = "2.0"
                 }
             }
             jvmToolchain(21)
@@ -22,8 +22,8 @@ kotlin {
         kotlin {
             sourceSets.all {
                 languageSettings {
-                    languageVersion = "2.0"
-                    apiVersion = "2.0"
+                    // languageVersion = "2.0"
+                    // apiVersion = "2.0"
                 }
             }
             jvmToolchain(21)

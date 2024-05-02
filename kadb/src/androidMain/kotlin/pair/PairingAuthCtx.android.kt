@@ -34,16 +34,16 @@ actual class PairingAuthCtx(
         return true
     }
 
-    actual fun encrypt(`in`: ByteArray): ByteArray? {
+    actual fun encrypt(input: ByteArray): ByteArray? {
         return encryptDecrypt(
-            true, `in`, ByteBuffer.allocate(GCM_IV_LENGTH)
+            true, input, ByteBuffer.allocate(GCM_IV_LENGTH)
                 .order(ByteOrder.LITTLE_ENDIAN).putLong(mEncIv++).array()
         )
     }
 
-    actual fun decrypt(`in`: ByteArray): ByteArray? {
+    actual fun decrypt(input: ByteArray): ByteArray? {
         return encryptDecrypt(
-            false, `in`, ByteBuffer.allocate(GCM_IV_LENGTH)
+            false, input, ByteBuffer.allocate(GCM_IV_LENGTH)
                 .order(ByteOrder.LITTLE_ENDIAN).putLong(mDecIv++).array()
         )
     }

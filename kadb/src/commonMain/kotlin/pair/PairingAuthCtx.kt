@@ -21,8 +21,8 @@ import javax.security.auth.Destroyable
 expect class PairingAuthCtx : Destroyable {
     val msg: ByteArray
     fun initCipher(theirMsg: ByteArray?): Boolean
-    fun encrypt(`in`: ByteArray): ByteArray?
-    fun decrypt(`in`: ByteArray): ByteArray?
+    fun encrypt(input: ByteArray): ByteArray?
+    fun decrypt(input: ByteArray): ByteArray?
     override fun isDestroyed(): Boolean
     override fun destroy()
 

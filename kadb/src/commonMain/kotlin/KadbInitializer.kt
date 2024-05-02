@@ -16,22 +16,15 @@
 
 package com.flyfishxu.kadb
 
-import java.io.File
-
 object KadbInitializer : ConfigProvider {
-    private lateinit var _certificate: File
-    private lateinit var _privateKey: File
+    private var _workDir: String? = null
 
-    fun initialize(certificate: File, privateKey: File) {
-        _certificate = certificate
-        _privateKey = privateKey
+    fun initialize(workDir: String) {
+        _workDir = workDir
     }
 
-    override val certificate: File
-        get() = if (::_certificate.isInitialized) _certificate
-        else throw UninitializedPropertyAccessException("Library has not been initialized")
-
-    override val privateKey: File
-        get() = if (::_privateKey.isInitialized) _privateKey
-        else throw  UninitializedPropertyAccessException("Library has not been initialized")
+    override val workDir: String
+        get() {
+            return requireNotNull(_workDir) { "Library has not been initialized" }
+        }
 }

@@ -16,9 +16,6 @@
 
 package com.flyfishxu.kadb
 
-import java.io.File
-
 interface ConfigProvider {
-    val certificate: File
-    val privateKey: File
+    val workDir: String
 }

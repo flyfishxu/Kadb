@@ -5,17 +5,28 @@ plugins {
 }
 
 kotlin {
-    jvm()
+    jvm {
+        kotlin {
+            sourceSets.all {
+                languageSettings {
+                    languageVersion = "2.0"
+                    apiVersion = "2.0"
+                }
+            }
+            jvmToolchain(21)
+        }
+    }
 
     androidTarget {
         publishAllLibraryVariants()
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "17"
-            }
-        }
         kotlin {
-            jvmToolchain(17)
+            sourceSets.all {
+                languageSettings {
+                    languageVersion = "2.0"
+                    apiVersion = "2.0"
+                }
+            }
+            jvmToolchain(21)
         }
     }
 

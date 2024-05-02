@@ -20,6 +20,7 @@ package com.flyfishxu.kadb
 import com.flyfishxu.kadb.AdbKeyPair.Companion.read
 import com.flyfishxu.kadb.SslUtils.getSSLSocket
 import com.flyfishxu.kadb.exception.AdbAuthException
+import com.flyfishxu.kadb.exception.AdbPairAuthException
 import okio.Sink
 import okio.Source
 import okio.sink
@@ -29,6 +30,7 @@ import java.io.Closeable
 import java.io.IOException
 import java.net.Socket
 import java.util.*
+import javax.net.ssl.SSLProtocolException
 
 internal class AdbConnection internal constructor(
     adbReader: AdbReader,
@@ -117,7 +119,11 @@ internal class AdbConnection internal constructor(
         ): AdbConnection {
             adbWriter.writeConnect()
 
-            var message = adbReader.readMessage()
+            var message: AdbMessage = try {
+                adbReader.readMessage()
+            } catch (e: SSLProtocolException) {
+                throw AdbPairAuthException()
+            }
 
             if (message.command == AdbProtocol.CMD_STLS) {
                 val host = socket.inetAddress.hostAddress!!
@@ -143,7 +149,8 @@ internal class AdbConnection internal constructor(
                 if (message.command == AdbProtocol.CMD_AUTH) {
                     adbWriter.writeAuth(AdbProtocol.AUTH_TYPE_RSA_PUBLIC, keyPair.publicKey.encoded)
                     throw AdbAuthException()
-                    //message = adbReader.readMessage()
+
+                    //message = adbReader.readMessage() TODO
                 }
             }
 

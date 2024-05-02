@@ -122,7 +122,11 @@ internal class AdbConnection internal constructor(
             var message: AdbMessage = try {
                 adbReader.readMessage()
             } catch (e: SSLProtocolException) {
-                throw AdbPairAuthException()
+                if (e.message?.contains("SSLV3_ALERT_CERTIFICATE_UNKNOWN") == true) {
+                    throw AdbPairAuthException()
+                } else {
+                    throw e
+                }
             }
 
             if (message.command == AdbProtocol.CMD_STLS) {

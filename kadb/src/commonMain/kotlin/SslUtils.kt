@@ -26,6 +26,7 @@ import okio.sink
 import java.net.Socket
 import java.security.*
 import java.security.cert.X509Certificate
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.*
 
 object SslUtils {
@@ -38,10 +39,25 @@ object SslUtils {
         val sink: BufferedSink = socket.sink().buffer()
         sink.write(AdbProtocol.generateStls())
         sink.flush()
+
         val sslContext = keyPair?.let { getSslContext(it) }
-        val tlsSocket = sslContext?.socketFactory?.createSocket(socket, host, port, true) as SSLSocket
-        tlsSocket.startHandshake()
-        return tlsSocket
+        var tlsSocket: SSLSocket? = null
+        var retryCount = 0
+        val maxRetries = 3
+
+        while (retryCount < maxRetries) try {
+            tlsSocket = sslContext?.socketFactory?.createSocket(socket, host, port, true) as SSLSocket
+            tlsSocket.startHandshake()
+            break
+        } catch (e: SSLHandshakeException) {
+            retryCount++
+            if (retryCount == maxRetries) {
+                throw e
+            } else {
+                TimeUnit.SECONDS.sleep(1)
+            }
+        }
+        return tlsSocket!!
     }
 
     fun getSslContext(keyPair: AdbKeyPair): SSLContext {

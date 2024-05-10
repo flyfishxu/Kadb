@@ -120,7 +120,7 @@ internal class AdbConnection internal constructor(
             adbWriter.writeConnect()
 
             var message: AdbMessage = try {
-                adbReader.readMessage()
+                adbReader.readMessage() // TODO：Happened Connection Reset
             } catch (e: SSLProtocolException) {
                 if (e.message?.contains("SSLV3_ALERT_CERTIFICATE_UNKNOWN") == true) {
                     throw AdbPairAuthException()

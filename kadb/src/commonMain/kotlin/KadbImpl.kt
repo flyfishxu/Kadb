@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- */
-/*
+ *//*
  * Copyright (c) 2024 Flyfish-Xu
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +34,7 @@ package com.flyfishxu.kadb
 import org.jetbrains.annotations.TestOnly
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.net.SocketException
 
 internal class KadbImpl @Throws(IllegalArgumentException::class) constructor(
     private val host: String,
@@ -97,11 +97,26 @@ internal class KadbImpl @Throws(IllegalArgumentException::class) constructor(
     }
 
     private fun newConnection(): Pair<AdbConnection, Socket> {
-        val socketAddress = InetSocketAddress(host, port)
-        val socket = Socket()
-        socket.soTimeout = socketTimeout
-        socket.connect(socketAddress, connectTimeout)
-        val adbConnection = AdbConnection.connect(socket, keyPair)
-        return adbConnection to socket
+        var attempt = 0
+        while (true) {
+            attempt++
+            try {
+                val socketAddress = InetSocketAddress(host, port)
+                val socket = Socket()
+                socket.soTimeout = socketTimeout
+                socket.connect(socketAddress, connectTimeout)
+                val adbConnection = AdbConnection.connect(socket, keyPair)
+                return adbConnection to socket
+            } catch (e: Exception) {
+                // handle exception
+                println("CONNECT LOST; TRYING TO REBUILD SOCKET $attempt TIMES")
+                if (attempt >= 5) {
+                    throw e
+                }
+                // wait before retrying
+                Thread.sleep(1000)
+            }
+        }
     }
 }
+

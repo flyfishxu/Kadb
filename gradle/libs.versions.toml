@@ -1,11 +1,11 @@
 [versions]
-agp = "8.4.0"
+agp = "8.2.0"
 bc = "1.77"
 jmdns = "3.5.9"
 spake2Java = "0.9.0"
 spake2Android = "2.0.0"
 kotlin = "1.9.23"
-kotlinxCoroutinesCore = "1.8.0"
+kotlinxCoroutinesCore = "1.8.1"
 nexus-publish = "2.0.0-rc-1"
 okio = "3.9.0"
 documentfile = "1.0.1"

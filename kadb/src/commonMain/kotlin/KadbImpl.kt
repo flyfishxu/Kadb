@@ -34,7 +34,6 @@ package com.flyfishxu.kadb
 import org.jetbrains.annotations.TestOnly
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.net.SocketException
 
 internal class KadbImpl @Throws(IllegalArgumentException::class) constructor(
     private val host: String,

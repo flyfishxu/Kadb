@@ -7,12 +7,6 @@ plugins {
 kotlin {
     jvm {
         kotlin {
-            sourceSets.all {
-                languageSettings {
-                    // languageVersion = "2.0"
-                    // apiVersion = "2.0"
-                }
-            }
             jvmToolchain(21)
         }
     }
@@ -20,12 +14,6 @@ kotlin {
     androidTarget {
         publishAllLibraryVariants()
         kotlin {
-            sourceSets.all {
-                languageSettings {
-                    // languageVersion = "2.0"
-                    // apiVersion = "2.0"
-                }
-            }
             jvmToolchain(21)
         }
     }
@@ -64,7 +52,7 @@ kotlin {
 
 android {
     namespace = "com.flyfishxu.kadb"
-    compileSdk = 34
+    compileSdk = 35
     defaultConfig {
         minSdk = 23
     }

@@ -52,7 +52,7 @@ kotlin {
 
 android {
     namespace = "com.flyfishxu.kadb"
-    compileSdk = 34
+    compileSdk = 35
     defaultConfig {
         minSdk = 23
     }

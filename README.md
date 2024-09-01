@@ -10,7 +10,7 @@ dependencies {
 ```
 
 ## Warning
-We are working for make Kadb to a KMP support library, so some of APIs in Kadb may be changed in future releases.
+We are working for make Kadb to support KMP(Kotlin Multiplatform), so some of the APIs in Kadb may changed in the future releases. After our works finish, the APSs will be stable.
 
 ## Express Gratitude 
 

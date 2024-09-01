@@ -9,6 +9,9 @@ dependencies {
 }
 ```
 
+## Warning
+We are working for make Kadb to a KMP support library, so some of APIs in Kadb may be changed in future releases.
+
 ## Express Gratitude 
 
 - [Dadb](https://github.com/mobile-dev-inc/dadb): Kadb is based on the second development of Dadb, and we would like to thank mobile-dev-inc for all their previous efforts!

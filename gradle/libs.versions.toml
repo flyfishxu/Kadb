@@ -8,13 +8,13 @@ dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
 [versions]
 
-agp = "8.7.0-alpha03"
+agp = "8.6.1"
 bc = "1.78.1"
 jmdns = "3.5.9"
 spake2Java = "0.9.0"
 spake2Android = "2.0.0"
-kotlin = "2.0.20-Beta2"
-kotlinxCoroutinesCore = "1.9.0-RC"
+kotlin = "2.0.20"
+kotlinxCoroutinesCore = "1.9.0-RC.2"
 nexus-publish = "2.0.0-rc-1"
 okio = "3.9.0"
 documentfile = "1.1.0-alpha01"

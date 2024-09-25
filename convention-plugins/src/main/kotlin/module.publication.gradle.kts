@@ -14,11 +14,13 @@ publishing {
             archiveAppendix.set(this@withType.name)
         })
 
+        /**
         artifact(tasks.register("${name}SourceJar", Jar::class) {
             archiveClassifier.set("sources")
             archiveAppendix.set(this@withType.name)
-            //from(android.sourceSets["main"].java.srcDirs)
+            from(android.sourceSets["main"].java.srcDirs)
         })
+        **/
 
         // Provide artifacts information required by Maven Central
         pom {

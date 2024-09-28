@@ -35,3 +35,7 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+convention-plugins/src/main/kotlin/module.publication.gradle.kts
+
+.kotlin/sessions/

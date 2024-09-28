@@ -33,6 +33,7 @@ kotlin {
             dependencies {
                 implementation(libs.spake2.android)
                 implementation(libs.documentfile)
+                implementation(libs.hiddenapibypass)
             }
         }
         val jvmMain by getting {

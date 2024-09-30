@@ -1,5 +1,3 @@
-import org.gradle.api.tasks.SourceSetContainer
-
 plugins {
     `maven-publish`
     signing

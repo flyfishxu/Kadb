@@ -12,13 +12,10 @@ kotlin {
     }
 
     androidTarget {
-        publishAllLibraryVariants()
         kotlin {
             jvmToolchain(21)
         }
     }
-
-    applyDefaultHierarchyTemplate()
 
     sourceSets {
         val commonMain by getting {
@@ -49,7 +46,6 @@ kotlin {
         }
     }
 }
-
 
 android {
     namespace = "com.flyfishxu.kadb"

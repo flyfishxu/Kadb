@@ -25,7 +25,7 @@ hiddenapibypass = "4.3"
 bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bc" }
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bc" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
-spake2 = { module = "com.github.flyfishxu:spake2-java", version.ref = "spake2" }
+spake2 = { module = "com.github.flyfishxu.spake2-java:spake2", version.ref = "spake2" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
 nexus-publish = { module = "io.github.gradle-nexus.publish-plugin:io.github.gradle-nexus.publish-plugin.gradle.plugin", version.ref = "nexus-publish" }

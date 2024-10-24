@@ -22,5 +22,4 @@ plugins {
 }
 
 rootProject.name = "Kadb-KMP"
-
 include(":kadb")

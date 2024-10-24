@@ -151,10 +151,10 @@ internal class AdbConnection internal constructor(
 
                 message = adbReader.readMessage()
                 if (message.command == AdbProtocol.CMD_AUTH) {
-                    adbWriter.writeAuth(AdbProtocol.AUTH_TYPE_RSA_PUBLIC, keyPair.publicKey.encoded)
+                    adbWriter.writeAuth(AdbProtocol.AUTH_TYPE_RSA_PUBLIC, keyPair.getPublicKeyBytes())
                     throw AdbAuthException()
 
-                    //message = adbReader.readMessage() TODO
+                    //message = adbReader.readMessage()
                 }
             }
 

@@ -41,7 +41,7 @@ class PairingConnectionCtx(
     private val mPwd: ByteArray = Objects.requireNonNull(pwd)
     private val mPeerInfo: PeerInfo = PeerInfo(
         PeerInfo.ADB_RSA_PUB_KEY, encodeWithName(
-            (keyPair.publicKey as RSAPublicKey), Objects.requireNonNull(deviceName)
+            (keyPair.certificate.publicKey as RSAPublicKey), Objects.requireNonNull(deviceName)
         )
     )
     private val mSslContext: SSLContext = getSslContext(keyPair)

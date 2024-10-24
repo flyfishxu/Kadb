@@ -15,6 +15,7 @@ kotlin {
         kotlin {
             jvmToolchain(21)
         }
+        publishAllLibraryVariants()
     }
 
     sourceSets {

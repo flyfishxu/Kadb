@@ -19,7 +19,6 @@ package com.flyfishxu.kadb
 
 import com.flyfishxu.kadb.AdbKeyPair.Companion.read
 import com.flyfishxu.kadb.SslUtils.getSSLSocket
-import com.flyfishxu.kadb.exception.AdbAuthException
 import com.flyfishxu.kadb.exception.AdbPairAuthException
 import okio.Sink
 import okio.Source
@@ -151,10 +150,11 @@ internal class AdbConnection internal constructor(
 
                 message = adbReader.readMessage()
                 if (message.command == AdbProtocol.CMD_AUTH) {
-                    adbWriter.writeAuth(AdbProtocol.AUTH_TYPE_RSA_PUBLIC, keyPair.publicKey.encoded)
-                    throw AdbAuthException()
-
-                    //message = adbReader.readMessage() TODO
+                    adbWriter.writeAuth(
+                        AdbProtocol.AUTH_TYPE_RSA_PUBLIC,
+                        adbPublicKey(keyPair)
+                    )
+                    message = adbReader.readMessage()
                 }
             }
 

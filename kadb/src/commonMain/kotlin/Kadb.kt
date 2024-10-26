@@ -351,6 +351,8 @@ interface Kadb : AutoCloseable {
             }
         }
 
+        // https://github.com/Genymobile/scrcpy/issues/4368
+        // TODO: It will cause serious issue if device hide root or use kernelsu, apatch.
         private fun waitRootOrClose(kadb: Kadb, root: Boolean) {
             while (true) {
                 try {

@@ -88,10 +88,10 @@ class AdbKeyPair(
 }
 
 @OptIn(ExperimentalEncodingApi::class)
-fun adbPublicKey(keyPair: AdbKeyPair): ByteArray {
+fun AdbKeyPair.Companion.adbPublicKey(keyPair: AdbKeyPair): ByteArray {
     val pubkey = keyPair.publicKey as RSAPublicKey
-    val bytes = convertRsaPublicKeyToAdbFormat(pubkey)
-    return Base64.encodeToByteArray(bytes) + " unknown@unknown".encodeToByteArray()
+    val bytes = AdbKeyPair.Companion.convertRsaPublicKeyToAdbFormat(pubkey)
+    return Base64.encodeToByteArray(bytes) + " ${AdbKeyPair.getDeviceName()}}".encodeToByteArray()
 }
 
 @OptIn(ExperimentalEncodingApi::class)
@@ -161,7 +161,7 @@ fun AdbKeyPair.Companion.generate(
 
 // https://github.com/cgutman/AdbLib/blob/d6937951eb98557c76ee2081e383d50886ce109a/src/com/cgutman/adblib/AdbCrypto.java#L83-L137
 @Suppress("JoinDeclarationAndAssignment")
-fun convertRsaPublicKeyToAdbFormat(pubkey: RSAPublicKey): ByteArray {/*
+internal fun AdbKeyPair.Companion.convertRsaPublicKeyToAdbFormat(pubkey: RSAPublicKey): ByteArray {/*
      * ADB literally just saves the RSAPublicKey struct to a file.
      *
      * typedef struct RSAPublicKey {

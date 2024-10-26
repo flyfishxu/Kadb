@@ -152,7 +152,7 @@ internal class AdbConnection internal constructor(
                 if (message.command == AdbProtocol.CMD_AUTH) {
                     adbWriter.writeAuth(
                         AdbProtocol.AUTH_TYPE_RSA_PUBLIC,
-                        adbPublicKey(keyPair)
+                        AdbKeyPair.Companion.adbPublicKey(keyPair)
                     )
                     message = adbReader.readMessage()
                 }

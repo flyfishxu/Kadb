@@ -292,15 +292,11 @@ interface Kadb : AutoCloseable {
          */
         @Throws(Exception::class)
         suspend fun pair(
-            host: String, port: Int, pairingCode: String, customName: String? = null
+            host: String, port: Int, pairingCode: String
         ) = withContext(Dispatchers.Default) {
             val keyPair = read()
             PairingConnectionCtx(
-                host,
-                port,
-                pairingCode.toByteArray(Charsets.UTF_8),
-                keyPair,
-                if (customName != null) customName else AdbKeyPair.getDeviceName()
+                host, port, pairingCode.toByteArray(), keyPair, AdbKeyPair.getDeviceName()
             ).use { pairingClient ->
                 pairingClient.start()
             }
@@ -312,7 +308,7 @@ interface Kadb : AutoCloseable {
         ) = withContext(Dispatchers.Default) {
             val keyPair = read()
             PairingConnectionCtx(
-                host, port, pairingCode.toByteArray(Charsets.UTF_8), keyPair, name
+                host, port, pairingCode.toByteArray(), keyPair, name
             ).use { pairingClient ->
                 pairingClient.start()
             }

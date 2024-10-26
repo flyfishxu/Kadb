@@ -128,7 +128,7 @@ fun AdbKeyPair.Companion.generate(
     l: String = "Kadb",
     st: String = "Kadb",
     c: String = "Kadb",
-    notAfter: Time = Time(Date(System.currentTimeMillis() + 864000000)), // 10 days
+    notAfter: Time = Time(Date(System.currentTimeMillis() + 10368000000)), // 120 days
     serialNumber: BigInteger = BigInteger(64, SecureRandom())
 ): AdbKeyPair {
     Security.addProvider(BouncyCastleProvider())
@@ -161,7 +161,7 @@ fun AdbKeyPair.Companion.generate(
 
 // https://github.com/cgutman/AdbLib/blob/d6937951eb98557c76ee2081e383d50886ce109a/src/com/cgutman/adblib/AdbCrypto.java#L83-L137
 @Suppress("JoinDeclarationAndAssignment")
-internal fun AdbKeyPair.Companion.convertRsaPublicKeyToAdbFormat(pubkey: RSAPublicKey): ByteArray {/*
+fun AdbKeyPair.Companion.convertRsaPublicKeyToAdbFormat(pubkey: RSAPublicKey): ByteArray {/*
      * ADB literally just saves the RSAPublicKey struct to a file.
      *
      * typedef struct RSAPublicKey {

@@ -1,5 +1,3 @@
-apply(from = "../../../../publish.gradle.kts")
-
 plugins {
     `maven-publish`
     signing
@@ -13,14 +11,6 @@ publishing {
             archiveClassifier.set("javadoc")
             archiveAppendix.set(this@withType.name)
         })
-
-        /**
-        artifact(tasks.register("${name}SourceJar", Jar::class) {
-            archiveClassifier.set("sources")
-            archiveAppendix.set(this@withType.name)
-            from(android.sourceSets["main"].java.srcDirs)
-        })
-        **/
 
         // Provide artifacts information required by Maven Central
         pom {
@@ -39,7 +29,7 @@ publishing {
                     id.set("flyfishxu")
                     name.set("Flyfish Xu")
                     organization.set("Flyfish Studio")
-                    email.set( "flyfishxu@outlook.com")
+                    email.set("flyfishxu@outlook.com")
                 }
             }
             scm {
@@ -54,8 +44,8 @@ publishing {
         maven {
             url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2")
             credentials {
-                username = extra["sonatypeUsername"] as String
-                password = extra["sonatypePassword"] as String
+                username = project.findProperty("sonatypeUsername") as String? ?: ""
+                password = project.findProperty("sonatypePassword") as String? ?: ""
             }
         }
         mavenLocal()

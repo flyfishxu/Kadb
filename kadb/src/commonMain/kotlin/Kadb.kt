@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- */
-/*
+ *//*
  * Copyright (c) 2024 Flyfish-Xu
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,10 +64,7 @@ interface Kadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun push(
-        src: File,
-        remotePath: String,
-        mode: Int = readMode(src),
-        lastModifiedMs: Long = src.lastModified()
+        src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()
     ) {
         push(src.source(), remotePath, mode, lastModifiedMs)
     }
@@ -148,21 +144,14 @@ interface Kadb : AutoCloseable {
                     throw IOException("connect error for create: $response")
                 }
                 val pattern = """\[(\w+)]""".toRegex()
-                val sessionId = pattern.find(response)?.groups?.get(1)?.value
-                    ?: throw IOException("failed to create session")
+                val sessionId =
+                    pattern.find(response)?.groups?.get(1)?.value ?: throw IOException("failed to create session")
 
                 var error: String? = null
                 apks.forEach { apk ->
                     // install write every apk file to stream
                     abbExec(
-                        "package",
-                        "install-write",
-                        "-S",
-                        apk.length().toString(),
-                        sessionId,
-                        apk.name,
-                        "-",
-                        *options
+                        "package", "install-write", "-S", apk.length().toString(), sessionId, apk.name, "-", *options
                     ).use { writeStream ->
                         writeStream.sink.writeAll(apk.source())
                         writeStream.sink.flush()
@@ -197,8 +186,8 @@ interface Kadb : AutoCloseable {
             }
 
             val pattern = """\[(\w+)]""".toRegex()
-            val sessionId = pattern.find(response.allOutput)?.groups?.get(1)?.value
-                ?: throw IOException("failed to create session")
+            val sessionId =
+                pattern.find(response.allOutput)?.groups?.get(1)?.value ?: throw IOException("failed to create session")
             var error: String? = null
 
             val fileNames = apks.map { it.name }
@@ -218,8 +207,7 @@ interface Kadb : AutoCloseable {
                 }
 
                 // pm install-write -S APK_SIZE SESSION_ID INDEX PATH
-                val writeResponse =
-                    shell("pm install-write -S ${apk.length()} $sessionId $index $remotePath")
+                val writeResponse = shell("pm install-write -S ${apk.length()} $sessionId $index $remotePath")
                 if (!writeResponse.allOutput.startsWith("Success")) {
                     error = writeResponse.allOutput
                     return@forEachIndexed
@@ -227,8 +215,7 @@ interface Kadb : AutoCloseable {
             }
 
             // step3: commit or abandon the session
-            val finalCommand =
-                if (error == null) "pm install-commit $sessionId" else "pm install-abandon $sessionId"
+            val finalCommand = if (error == null) "pm install-commit $sessionId" else "pm install-abandon $sessionId"
             val finalResponse = shell(finalCommand)
             if (!finalResponse.allOutput.startsWith("Success")) {
                 throw IOException("failed to finalize session: $finalResponse")
@@ -295,25 +282,21 @@ interface Kadb : AutoCloseable {
         /**
          * Pair with an ADB daemon given host address, port number and pairing code.
          *
-         * @param host        Host address to use instead of taking it from the
+         * @param host        Remote device host address
          * @param port        Port number
          * @param pairingCode The six-digit pairing code as string
+         * @param customName  Custom device name shown in paired devices list.
+         *                    If not given, Kadb will use host device name.
          * @return `true` if the pairing is successful and `false` otherwise.
          * @throws Exception If pairing failed for some reason.
          */
         @Throws(Exception::class)
         suspend fun pair(
-            host: String,
-            port: Int,
-            pairingCode: String,
+            host: String, port: Int, pairingCode: String
         ) = withContext(Dispatchers.Default) {
             val keyPair = read()
             PairingConnectionCtx(
-                host,
-                port,
-                pairingCode.toByteArray(Charsets.UTF_8),
-                keyPair,
-                AdbKeyPair.getDeviceName()
+                host, port, pairingCode.toByteArray(), keyPair, AdbKeyPair.getDeviceName()
             ).use { pairingClient ->
                 pairingClient.start()
             }
@@ -321,18 +304,11 @@ interface Kadb : AutoCloseable {
 
         @Throws(Exception::class)
         suspend fun pair(
-            host: String,
-            port: Int,
-            pairingCode: String,
-            name: String
+            host: String, port: Int, pairingCode: String, name: String
         ) = withContext(Dispatchers.Default) {
             val keyPair = read()
             PairingConnectionCtx(
-                host,
-                port,
-                pairingCode.toByteArray(Charsets.UTF_8),
-                keyPair,
-                name
+                host, port, pairingCode.toByteArray(), keyPair, name
             ).use { pairingClient ->
                 pairingClient.start()
             }
@@ -341,13 +317,8 @@ interface Kadb : AutoCloseable {
         @JvmStatic
         @JvmOverloads
         fun create(
-            host: String,
-            port: Int,
-            keyPair: AdbKeyPair? = read(),
-            connectTimeout: Int = 0,
-            socketTimeout: Int = 0
-        ): Kadb =
-            KadbImpl(host, port, keyPair, connectTimeout, socketTimeout)
+            host: String, port: Int, keyPair: AdbKeyPair? = read(), connectTimeout: Int = 0, socketTimeout: Int = 0
+        ): Kadb = KadbImpl(host, port, keyPair, connectTimeout, socketTimeout)
 
         @JvmStatic
         @JvmOverloads
@@ -380,6 +351,8 @@ interface Kadb : AutoCloseable {
             }
         }
 
+        // https://github.com/Genymobile/scrcpy/issues/4368
+        // TODO: It will cause serious issue if device hide root or use kernelsu, apatch.
         private fun waitRootOrClose(kadb: Kadb, root: Boolean) {
             while (true) {
                 try {

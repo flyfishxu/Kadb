@@ -12,13 +12,11 @@ kotlin {
     }
 
     androidTarget {
-        publishAllLibraryVariants()
         kotlin {
             jvmToolchain(21)
         }
+        publishAllLibraryVariants()
     }
-
-    applyDefaultHierarchyTemplate()
 
     sourceSets {
         val commonMain by getting {
@@ -31,14 +29,14 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation(libs.spake2.android)
+                implementation(libs.spake2)
                 implementation(libs.documentfile)
                 implementation(libs.hiddenapibypass)
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation(libs.spake2.java)
+                implementation(libs.spake2)
                 implementation(libs.jmdns)
             }
         }
@@ -49,7 +47,6 @@ kotlin {
         }
     }
 }
-
 
 android {
     namespace = "com.flyfishxu.kadb"

@@ -47,6 +47,9 @@ private const val KEY_END = "-----END PRIVATE KEY-----"
 private const val CERT_BEGIN = "-----BEGIN CERTIFICATE-----"
 private const val CERT_END = "-----END CERTIFICATE-----"
 
+private const val KEY_LENGTH_BITS = 2048
+private const val KEY_LENGTH_BYTES = KEY_LENGTH_BITS / 8
+private const val KEY_LENGTH_WORDS = KEY_LENGTH_BYTES / 4
 
 class AdbKeyPair(
     val privateKey: PrivateKey, val certificate: Certificate
@@ -148,10 +151,15 @@ class AdbKeyPair(
 }
 
 @OptIn(ExperimentalEncodingApi::class)
+fun AdbKeyPair.Companion.adbPublicKey(keyPair: AdbKeyPair): ByteArray {
+    val pubkey = keyPair.publicKey as RSAPublicKey
+    val bytes = AdbKeyPair.Companion.convertRsaPublicKeyToAdbFormat(pubkey)
+    return Base64.encodeToByteArray(bytes) + " ${AdbKeyPair.getDeviceName()}}".encodeToByteArray()
+}
+
+@OptIn(ExperimentalEncodingApi::class)
 fun AdbKeyPair.Companion.writePrivateKeyToFile(privateKey: PrivateKey) {
     val privateKeyFile = File(workDir, "adbKey")
-
-    // TODO: USE "-----BEGIN PRIVATE KEY-----\n" or add a WriteByte as now on? Which prettier or performance?
 
     privateKeyFile.sink().buffer().use { sink ->
         sink.writeUtf8(KEY_BEGIN)
@@ -183,7 +191,7 @@ fun AdbKeyPair.Companion.generate(
     l: String = "Kadb",
     st: String = "Kadb",
     c: String = "Kadb",
-    notAfter: Time = Time(Date(System.currentTimeMillis() + 864000000)), // 10 days
+    notAfter: Time = Time(Date(System.currentTimeMillis() + 10368000000)), // 120 days
     serialNumber: BigInteger = BigInteger(64, SecureRandom())
 ): AdbKeyPair {
     Security.addProvider(BouncyCastleProvider())
@@ -214,5 +222,55 @@ fun AdbKeyPair.Companion.generate(
     return AdbKeyPair(privateKey, certificate)
 }
 
+// https://github.com/cgutman/AdbLib/blob/d6937951eb98557c76ee2081e383d50886ce109a/src/com/cgutman/adblib/AdbCrypto.java#L83-L137
+@Suppress("JoinDeclarationAndAssignment")
+fun AdbKeyPair.Companion.convertRsaPublicKeyToAdbFormat(pubkey: RSAPublicKey): ByteArray {/*
+     * ADB literally just saves the RSAPublicKey struct to a file.
+     *
+     * typedef struct RSAPublicKey {
+     * int len; // Length of n[] in number of uint32_t
+     * uint32_t n0inv;  // -1 / n[0] mod 2^32
+     * uint32_t n[RSANUMWORDS]; // modulus as little endian array
+     * uint32_t rr[RSANUMWORDS]; // R^2 as little endian array
+     * int exponent; // 3 or 65537
+     * } RSAPublicKey;
+     */
+
+    /* ------ This part is a Java-ified version of RSA_to_RSAPublicKey from adb_host_auth.c ------ */
+    val r32: BigInteger
+    val r: BigInteger
+    var rr: BigInteger
+    var rem: BigInteger
+    var n: BigInteger
+    val n0inv: BigInteger
+    r32 = BigInteger.ZERO.setBit(32)
+    n = pubkey.modulus
+    r = BigInteger.ZERO.setBit(KEY_LENGTH_WORDS * 32)
+    rr = r.modPow(BigInteger.valueOf(2), n)
+    rem = n.remainder(r32)
+    n0inv = rem.modInverse(r32)
+    val myN = IntArray(KEY_LENGTH_WORDS)
+    val myRr = IntArray(KEY_LENGTH_WORDS)
+    var res: Array<BigInteger>
+    for (i in 0 until KEY_LENGTH_WORDS) {
+        res = rr.divideAndRemainder(r32)
+        rr = res[0]
+        rem = res[1]
+        myRr[i] = rem.toInt()
+        res = n.divideAndRemainder(r32)
+        n = res[0]
+        rem = res[1]
+        myN[i] = rem.toInt()
+    }
+
+    /* ------------------------------------------------------------------------------------------- */
+    val bbuf: ByteBuffer = ByteBuffer.allocate(524).order(ByteOrder.LITTLE_ENDIAN)
+    bbuf.putInt(KEY_LENGTH_WORDS)
+    bbuf.putInt(n0inv.negate().toInt())
+    for (i in myN) bbuf.putInt(i)
+    for (i in myRr) bbuf.putInt(i)
+    bbuf.putInt(pubkey.publicExponent.toInt())
+    return bbuf.array()
+}
 
 expect fun AdbKeyPair.Companion.getDeviceName(): String

@@ -8,17 +8,16 @@ dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
 [versions]
 
-agp = "8.6.1"
+agp = "8.6.0-alpha07"
 bc = "1.78.1"
 jmdns = "3.5.12"
-spake2Java = "0.9.0"
-spake2Android = "2.0.0"
-kotlin = "2.0.20"
+spake2 = "0.0.5"
+kotlin = "2.1.0-Beta2"
 kotlinxCoroutinesCore = "1.9.0"
 nexus-publish = "2.0.0-rc-1"
 okio = "3.9.1"
 documentfile = "1.1.0-alpha01"
-dokka = "1.9.20"
+dokka = "2.0.0-Beta"
 hiddenapibypass = "4.3"
 
 [libraries]
@@ -26,8 +25,7 @@ hiddenapibypass = "4.3"
 bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bc" }
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bc" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
-spake2-android = { module = "com.github.MuntashirAkon.spake2-java:android", version.ref = "spake2Android" }
-spake2-java = { module = "com.github.MuntashirAkon:spake2-java", version.ref = "spake2Java" }
+spake2 = { module = "com.github.flyfishxu.spake2-java:spake2", version.ref = "spake2" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
 nexus-publish = { module = "io.github.gradle-nexus.publish-plugin:io.github.gradle-nexus.publish-plugin.gradle.plugin", version.ref = "nexus-publish" }

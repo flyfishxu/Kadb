@@ -20,11 +20,16 @@ package com.flyfishxu.kadb
 import com.flyfishxu.kadb.AdbShellPacket.*
 import java.io.IOException
 
+/**
+ * Value of the "packet kind" byte in a [shell v2 packet]
+ */
 const val ID_STDIN = 0
 const val ID_STDOUT = 1
 const val ID_STDERR = 2
 const val ID_EXIT = 3
-const val ID_CLOSE_STDIN = 3
+const val ID_CLOSE_STDIN = 4
+const val ID_WINDOW_SIZE_CHANGE = 5
+const val ID_INVALID = 255
 
 class AdbShellStream(
     private val stream: AdbStream
@@ -66,6 +71,9 @@ class AdbShellStream(
                 ID_STDOUT -> StdOut(payload)
                 ID_STDERR -> StdError(payload)
                 ID_EXIT -> Exit(payload)
+                ID_CLOSE_STDIN -> throw IOException("Todo: ID_CLOSE_STDIN")
+                ID_WINDOW_SIZE_CHANGE -> throw IOException("Todo: ID_WINDOW_SIZE_CHANGE")
+                ID_INVALID -> throw IOException("Todo: ID_INVALID")
                 else -> throw IllegalArgumentException("Invalid shell packet id: $id")
             }
         }

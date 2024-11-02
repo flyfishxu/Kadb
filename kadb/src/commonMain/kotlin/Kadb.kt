@@ -10,6 +10,7 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
 
+@Suppress("unused", "MemberVisibilityCanBePrivate")
 class Kadb private constructor(
     private val host: String,
     private val port: Int,
@@ -26,7 +27,7 @@ class Kadb private constructor(
     }
 
     fun supportsFeature(feature: String): Boolean =
-        connection().supportsFeature(feature) ?: false
+        connection().supportsFeature(feature)
 
     fun shell(command: String): AdbShellResponse =
         openShell(command).use { it.readAll() }
@@ -86,7 +87,7 @@ class Kadb private constructor(
                 val sessionId = extractSessionId(createStream.source.readUtf8())
                 val error = apks.firstNotNullOfOrNull { apk ->
                     abbExec("package", "install-write", "-S", apk.length().toString(), sessionId, apk.name, "-", *options)
-                        .use { it.sink.writeAll(apk.source()); it.sink.flush(); it.source.readUtf8().takeIf { !it.startsWith("Success") } }
+                        .use { adbStream -> adbStream.sink.writeAll(apk.source()); adbStream.sink.flush(); adbStream.source.readUtf8().takeIf { !it.startsWith("Success") } }
                 }
                 finalizeSession(sessionId, error, *options)
             }

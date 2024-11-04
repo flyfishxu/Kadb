@@ -8,7 +8,7 @@ dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
 [versions]
 
-agp = "8.6.0-alpha07"
+agp = "8.7.2"
 bc = "1.78.1"
 jmdns = "3.5.12"
 spake2 = "0.0.5"

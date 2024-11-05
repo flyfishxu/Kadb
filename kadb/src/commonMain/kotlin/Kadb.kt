@@ -11,7 +11,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
-class Kadb private constructor(
+class Kadb(
     private val host: String,
     private val port: Int,
     private val keyPair: AdbKeyPair? = null,
@@ -21,7 +21,7 @@ class Kadb private constructor(
 
     private var connection: Pair<AdbConnection, Socket>? = null
 
-    fun connectionCheck(): Boolean {
+    fun connectionChec1k(): Boolean {
         return connection?.second?.isConnected ?: false
     }
 

@@ -21,7 +21,7 @@ class Kadb(
 
     private var connection: Pair<AdbConnection, Socket>? = null
 
-    fun connectionChec1k(): Boolean {
+    fun connectionCheck(): Boolean {
         return connection?.second?.isConnected ?: false
     }
 

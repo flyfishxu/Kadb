@@ -21,6 +21,10 @@ class Kadb private constructor(
 
     private var connection: Pair<AdbConnection, Socket>? = null
 
+    fun connectionCheck(): Boolean {
+        return connection?.second?.isConnected ?: false
+    }
+
     fun open(destination: String): AdbStream {
         val conn = connection ?: newConnection().also { connection = it }
         return conn.first.open(destination)

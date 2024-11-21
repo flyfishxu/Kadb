@@ -12,7 +12,7 @@ object KadbCert {
     internal var key = byteArrayOf()
 
     /**
-     * Set AdbKeyPair
+     * Set keystore
      */
     fun set(cert: ByteArray, key: ByteArray) {
         this.cert = cert
@@ -21,7 +21,7 @@ object KadbCert {
     }
 
     /**
-     * Get currently in-use AdbKeyPair
+     * Get current in-use keystore
      */
     fun getOrError(): Pair<ByteArray, ByteArray> {
         if (cert.isEmpty() || key.isEmpty()) {
@@ -31,7 +31,7 @@ object KadbCert {
     }
 
     /**
-     * Generate new AdbKeyPair if not set
+     * Generate new keystore and set it
      */
     fun get(
         keySize: Int = 2048,
@@ -47,24 +47,6 @@ object KadbCert {
         if (cert.isEmpty() || key.isEmpty()) {
             generate(keySize, cn, ou, o, l, st, c, Time(Date(notAfter)), serialNumber)
         }
-        return cert to key
-    }
-
-    /**
-     * Generate new AdbKeyPair
-     */
-    fun getNew(
-        keySize: Int = 2048,
-        cn: String = "Kadb",
-        ou: String = "Kadb",
-        o: String = "Kadb",
-        l: String = "Kadb",
-        st: String = "Kadb",
-        c: String = "Kadb",
-        notAfter: Long = System.currentTimeMillis() + 10368000000, // 120 days
-        serialNumber: BigInteger = BigInteger(64, SecureRandom())
-    ): Pair<ByteArray, ByteArray> {
-        generate(keySize, cn, ou, o, l, st, c, Time(Date(notAfter)), serialNumber)
         return cert to key
     }
 }

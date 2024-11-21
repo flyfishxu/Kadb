@@ -36,13 +36,18 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation(libs.spake2)
+                implementation(libs.spake2.jvm)
                 implementation(libs.jmdns)
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(libs.kotlin.test)
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+                implementation(libs.conscrypt.java)
             }
         }
     }

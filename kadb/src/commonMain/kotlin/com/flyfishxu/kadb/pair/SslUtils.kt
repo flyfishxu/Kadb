@@ -22,6 +22,8 @@ import okio.BufferedSink
 import okio.buffer
 import okio.sink
 import java.net.Socket
+import java.nio.channels.Channels
+import java.nio.channels.SocketChannel
 import java.security.*
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
@@ -31,10 +33,12 @@ internal object SslUtils {
     var customConscrypt = false
     private var sslContext: SSLContext? = null
 
+    // TODO
     fun getSSLSocket(
-        socket: Socket, host: String?, port: Int, keyPair: AdbKeyPair?
+        socketChannel: SocketChannel, host: String?, port: Int, keyPair: AdbKeyPair?
     ): SSLSocket {
-        val sink: BufferedSink = socket.sink().buffer()
+        val sink: BufferedSink = Channels.newOutputStream(socketChannel).sink().buffer()
+
         sink.write(AdbProtocol.generateStls())
         sink.flush()
 
@@ -43,16 +47,23 @@ internal object SslUtils {
         var retryCount = 0
         val maxRetries = 3
 
-        while (retryCount < maxRetries) try {
-            tlsSocket = sslContext?.socketFactory?.createSocket(socket, host, port, true) as SSLSocket
-            tlsSocket.startHandshake()
-            break
-        } catch (e: SSLHandshakeException) {
-            retryCount++
-            if (retryCount == maxRetries) {
-                throw e
-            } else {
-                TimeUnit.SECONDS.sleep(1)
+        while (retryCount < maxRetries) {
+            try {
+                tlsSocket = sslContext?.socketFactory?.createSocket(
+                    socketChannel,
+                    host,
+                    port,
+                    true
+                ) as SSLSocket
+                tlsSocket.startHandshake()
+                break
+            } catch (e: SSLHandshakeException) {
+                retryCount++
+                if (retryCount == maxRetries) {
+                    throw e
+                } else {
+                    TimeUnit.SECONDS.sleep(1)
+                }
             }
         }
         return tlsSocket!!

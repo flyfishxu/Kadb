@@ -15,9 +15,11 @@ import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.IOException
 import java.math.BigInteger
-import java.net.Socket
+import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.Channels
+import java.nio.channels.SocketChannel
 import java.security.interfaces.RSAPublicKey
 import java.util.*
 import javax.net.ssl.SSLProtocolException
@@ -76,20 +78,21 @@ internal class AdbConnection internal constructor(
     }
 
     companion object {
-        fun connect(socket: Socket, keyPair: AdbKeyPair): AdbConnection {
-            val source = socket.source()
-            val sink = socket.sink()
-            return connect(socket, source, sink, keyPair, socket)
+
+        fun connect(socketChannel: SocketChannel, keyPair: AdbKeyPair): AdbConnection {
+            val source = Channels.newInputStream(socketChannel).source()
+            val sink = Channels.newOutputStream(socketChannel).sink()
+            return connect(socketChannel, source, sink, keyPair)
         }
 
         private fun connect(
-            socket: Socket, source: Source, sink: Sink, keyPair: AdbKeyPair, closeable: Closeable? = null
+            socketChannel: SocketChannel, source: Source, sink: Sink, keyPair: AdbKeyPair, closeable: Closeable? = null
         ): AdbConnection {
             val adbReader = AdbReader(source)
             val adbWriter = AdbWriter(sink)
 
             try {
-                return connect(socket, adbReader, adbWriter, keyPair, closeable)
+                return connect(socketChannel, adbReader, adbWriter, keyPair, closeable)
             } catch (t: Throwable) {
                 adbReader.close()
                 adbWriter.close()
@@ -98,12 +101,16 @@ internal class AdbConnection internal constructor(
         }
 
         private fun connect(
-            socket: Socket, adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair, closeable: Closeable?
+            socketChannel: SocketChannel,
+            adbReader: AdbReader,
+            adbWriter: AdbWriter,
+            keyPair: AdbKeyPair,
+            closeable: Closeable?
         ): AdbConnection {
             adbWriter.writeConnect()
 
             var message: AdbMessage = try {
-                adbReader.readMessage() // TODO：Happened Connection Reset
+                adbReader.readMessage() // TODO: Handle Connection Reset
             } catch (e: SSLProtocolException) {
                 if (e.message?.contains("SSLV3_ALERT_CERTIFICATE_UNKNOWN") == true) {
                     throw AdbPairAuthException()
@@ -113,12 +120,13 @@ internal class AdbConnection internal constructor(
             }
 
             if (message.command == AdbProtocol.CMD_STLS) {
-                val host = socket.inetAddress.hostAddress!!
-                val port = socket.port
-                val newSocket = Socket(host, port)
-                val sslSocket = SslUtils.getSSLSocket(
-                    newSocket, host, port, loadKeyPair()
-                )
+                val host = (socketChannel.remoteAddress as InetSocketAddress).hostName
+                val port = (socketChannel.remoteAddress as InetSocketAddress).port
+                val newSocketChannel = SocketChannel.open()
+                newSocketChannel.configureBlocking(true)
+                newSocketChannel.connect(InetSocketAddress(host, port))
+
+                val sslSocket = SslUtils.getSSLSocket(newSocketChannel, host, port, loadKeyPair())
                 adbReader.close()
                 adbWriter.close()
                 return connect(sslSocket, keyPair)

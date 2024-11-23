@@ -16,6 +16,7 @@ import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.nio.channels.SocketChannel
 import kotlin.Throws
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
@@ -26,7 +27,7 @@ class Kadb(
     private val socketTimeout: Int = 0
 ) : AutoCloseable {
 
-    private var connection: Pair<AdbConnection, Socket>? = null
+    private var connection: Pair<AdbConnection, SocketChannel>? = null
 
     fun connectionCheck(): Boolean {
         return connection?.second?.isConnected == true
@@ -126,6 +127,7 @@ class Kadb(
 
     fun unroot() = restartAdb("unroot:")
 
+
     override fun close() {
         connection?.first?.close()
         connection = null
@@ -133,24 +135,22 @@ class Kadb(
 
     private fun connection(): AdbConnection {
         val conn = connection
-        return if (conn == null || conn.second.isClosed) {
+        return if (conn == null || !conn.second.isOpen) {
             newConnection().also { connection = it }.first
         } else conn.first
     }
 
-    private fun newConnection(): Pair<AdbConnection, Socket> {
+    private fun newConnection(): Pair<AdbConnection, SocketChannel> {
         var attempt = 0
         while (true) {
             attempt++
             try {
-                val socketAddress = InetSocketAddress(host, port)
-                val socket = Socket().apply {
-                    soTimeout = socketTimeout
-                    keepAlive = true
-                    connect(socketAddress, connectTimeout)
+                val socketChannel = SocketChannel.open().apply {
+                    configureBlocking(true)
+                    connect(InetSocketAddress(host, port))
                 }
-                val adbConnection = AdbConnection.connect(socket, loadKeyPair())
-                return adbConnection to socket
+                val adbConnection = AdbConnection.connect(socketChannel, loadKeyPair())
+                return adbConnection to socketChannel
             } catch (e: Exception) {
                 println("CONNECT LOST; TRYING TO REBUILD SOCKET $attempt TIMES")
                 if (attempt >= 5) throw e

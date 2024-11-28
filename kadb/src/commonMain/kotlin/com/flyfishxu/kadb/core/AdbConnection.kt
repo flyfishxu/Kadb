@@ -126,6 +126,7 @@ internal class AdbConnection internal constructor(
                 newSocketChannel.configureBlocking(true)
                 newSocketChannel.connect(InetSocketAddress(host, port))
 
+                // Todo: Change to SocketChannel
                 val sslSocket = SslUtils.getSSLSocket(newSocketChannel, host, port, loadKeyPair())
                 adbReader.close()
                 adbWriter.close()

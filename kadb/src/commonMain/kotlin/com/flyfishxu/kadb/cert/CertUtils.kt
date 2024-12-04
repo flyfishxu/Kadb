@@ -1,5 +1,6 @@
 package com.flyfishxu.kadb.cert
 
+import com.flyfishxu.kadb.debug.log
 import okio.Buffer
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.Time
@@ -27,10 +28,21 @@ private const val CERT_END = "-----END CERTIFICATE-----"
 private fun readCertificate(): Certificate? {
     val cert = KadbCert.cert
     if (cert.isEmpty()) return null
-    if (Security.getProvider("BC") == null) {
-        Security.addProvider(BouncyCastleProvider())
+
+    val providers = listOf(
+        { CertificateFactory.getInstance("X.509") },
+        { CertificateFactory.getInstance("X.509", BouncyCastleProvider()) },
+        { CertificateFactory.getInstance("X.509", "AndroidOpenSSL") }
+    )
+
+    for (provider in providers) {
+        try {
+            return provider().generateCertificate(cert.inputStream())
+        } catch (_: CertificateException) {
+            log { "Failed to generate certificate with provider: $provider" }
+        }
     }
-    return CertificateFactory.getInstance("X.509", "BC").generateCertificate(cert.inputStream())
+    throw CertificateException("All certificate providers failed to generate a certificate.")
 }
 
 private fun readPrivateKey(): PrivateKey? {

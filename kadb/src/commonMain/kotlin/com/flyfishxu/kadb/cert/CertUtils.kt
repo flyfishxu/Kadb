@@ -26,9 +26,9 @@ private const val CERT_BEGIN = "-----BEGIN CERTIFICATE-----"
 private const val CERT_END = "-----END CERTIFICATE-----"
 
 private val providers = listOf(
-    { CertificateFactory.getInstance("X.509") },
-    { CertificateFactory.getInstance("X.509", BouncyCastleProvider()) },
-    { CertificateFactory.getInstance("X.509", "AndroidOpenSSL") }
+    null,
+    BouncyCastleProvider(),
+    "AndroidOpenSSL"
 )
 
 private fun readCertificate(): Certificate? {
@@ -37,11 +37,17 @@ private fun readCertificate(): Certificate? {
 
     for (provider in providers) {
         try {
-            return provider().generateCertificate(cert.inputStream())
+            val certFactory = when (provider) {
+                is String -> CertificateFactory.getInstance("X.509", provider)
+                is Provider -> CertificateFactory.getInstance("X.509", provider)
+                else -> CertificateFactory.getInstance("X.509")
+            }
+            return certFactory.generateCertificate(cert.inputStream())
         } catch (_: CertificateException) {
             log { "Failed to generate certificate with provider: $provider" }
         }
     }
+
     throw CertificateException("All certificate providers failed to generate a certificate.")
 }
 
@@ -132,7 +138,11 @@ internal object CertUtils {
         var certificate: X509Certificate? = null
         for (provider in providers) {
             try {
-                certificate = JcaX509CertificateConverter().setProvider(BouncyCastleProvider()).getCertificate(certificateHolder)
+                certificate = when (provider) {
+                    is Provider -> JcaX509CertificateConverter().setProvider(provider).getCertificate(certificateHolder)
+                    is String -> JcaX509CertificateConverter().setProvider(provider).getCertificate(certificateHolder)
+                    else -> JcaX509CertificateConverter().getCertificate(certificateHolder)
+                }
             } catch (e: CertificateException) {
                 e.printStackTrace()
             }

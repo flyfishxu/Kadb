@@ -25,15 +25,15 @@ private const val KEY_END = "-----END PRIVATE KEY-----"
 private const val CERT_BEGIN = "-----BEGIN CERTIFICATE-----"
 private const val CERT_END = "-----END CERTIFICATE-----"
 
+private val providers = listOf(
+    { CertificateFactory.getInstance("X.509") },
+    { CertificateFactory.getInstance("X.509", BouncyCastleProvider()) },
+    { CertificateFactory.getInstance("X.509", "AndroidOpenSSL") }
+)
+
 private fun readCertificate(): Certificate? {
     val cert = KadbCert.cert
     if (cert.isEmpty()) return null
-
-    val providers = listOf(
-        { CertificateFactory.getInstance("X.509") },
-        { CertificateFactory.getInstance("X.509", BouncyCastleProvider()) },
-        { CertificateFactory.getInstance("X.509", "AndroidOpenSSL") }
-    )
 
     for (provider in providers) {
         try {
@@ -90,13 +90,13 @@ internal object CertUtils {
     fun loadKeyPair(): AdbKeyPair {
         val privateKey = readPrivateKey()
         val certificate = readCertificate()
-        // vailidateCertificate() -> Is that redundant?
+        // validateCertificate() -> Is that redundant?
         return if (privateKey == null || certificate == null) generate()
         else AdbKeyPair(privateKey, certificate.publicKey, certificate)
     }
 
     @Throws(CertificateExpiredException::class, CertificateNotYetValidException::class)
-    fun vailidateCertificate() {
+    fun validateCertificate() {
         val x509Certificate = readCertificate() as X509Certificate
         x509Certificate.checkValidity()
     }
@@ -112,8 +112,6 @@ internal object CertUtils {
         notAfter: Time = Time(Date(System.currentTimeMillis() + 10368000000)), // 120 days
         serialNumber: BigInteger = BigInteger(64, SecureRandom())
     ): AdbKeyPair {
-        Security.addProvider(BouncyCastleProvider())
-
         val keyPairGenerator = KeyPairGenerator.getInstance("RSA")
         keyPairGenerator.initialize(keySize, SecureRandom.getInstance("SHA1PRNG"))
         val generateKeyPair = keyPairGenerator.generateKeyPair()
@@ -130,8 +128,16 @@ internal object CertUtils {
 
         val contentSigner = JcaContentSignerBuilder("SHA512withRSA").build(privateKey)
         val certificateHolder = x509v3CertificateBuilder.build(contentSigner)
-        val certificate =
-            JcaX509CertificateConverter().setProvider(BouncyCastleProvider()).getCertificate(certificateHolder)
+
+        var certificate: X509Certificate? = null
+        for (provider in providers) {
+            try {
+                certificate = JcaX509CertificateConverter().setProvider(BouncyCastleProvider()).getCertificate(certificateHolder)
+            } catch (e: CertificateException) {
+                e.printStackTrace()
+            }
+        }
+        if (certificate == null) throw CertificateException("All certificate providers failed to generate a certificate.")
 
         KadbCert.key = writePrivateKey(privateKey)
         KadbCert.cert = writeCertificate(certificate)

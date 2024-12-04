@@ -27,7 +27,10 @@ private const val CERT_END = "-----END CERTIFICATE-----"
 private fun readCertificate(): Certificate? {
     val cert = KadbCert.cert
     if (cert.isEmpty()) return null
-    return CertificateFactory.getInstance("X.509").generateCertificate(cert.inputStream())
+    if (Security.getProvider("BC") == null) {
+        Security.addProvider(BouncyCastleProvider())
+    }
+    return CertificateFactory.getInstance("X.509", "BC").generateCertificate(cert.inputStream())
 }
 
 private fun readPrivateKey(): PrivateKey? {

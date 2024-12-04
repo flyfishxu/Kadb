@@ -1,7 +1,7 @@
 package com.flyfishxu.kadb.cert
 
 import com.flyfishxu.kadb.cert.CertUtils.generate
-import com.flyfishxu.kadb.cert.CertUtils.vailidateCertificate
+import com.flyfishxu.kadb.cert.CertUtils.validateCertificate
 import org.bouncycastle.asn1.x509.Time
 import java.math.BigInteger
 import java.security.SecureRandom
@@ -17,7 +17,7 @@ object KadbCert {
     fun set(cert: ByteArray, key: ByteArray) {
         this.cert = cert
         this.key = key
-        vailidateCertificate()
+        validateCertificate()
     }
 
     /**

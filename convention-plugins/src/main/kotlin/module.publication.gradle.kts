@@ -15,7 +15,7 @@ publishing {
         // Provide artifacts information required by Maven Central
         pom {
             name.set("Kadb")
-            description.set("A modern and versatile Kotlin ADB client library that simplifies the interaction with Android devices.")
+            description.set("A modern and versatile Kotlin Multiplatform ADB client library that simplifies the interaction with Android devices.")
             url.set("https://github.com/flyfishxu/Kadb.git")
 
             licenses {
@@ -53,8 +53,6 @@ publishing {
 }
 
 signing {
-    if (project.hasProperty("signing.gnupg.keyName")) {
-        useGpgCmd()
-        sign(publishing.publications)
-    }
+    useGpgCmd()
+    sign(publishing.publications)
 }

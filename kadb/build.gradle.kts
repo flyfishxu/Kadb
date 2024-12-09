@@ -24,6 +24,8 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.bcprov)
                 implementation(libs.bcpkix)
+                implementation(libs.conscrypt.java)
+                implementation(libs.tls.channel)
                 api(libs.okio)
             }
         }

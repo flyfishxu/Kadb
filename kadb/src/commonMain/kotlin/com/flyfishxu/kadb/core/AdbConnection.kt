@@ -1,7 +1,6 @@
 package com.flyfishxu.kadb.core
 
 import com.flyfishxu.kadb.cert.AdbKeyPair
-import com.flyfishxu.kadb.cert.CertUtils.loadKeyPair
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
 import com.flyfishxu.kadb.exception.AdbPairAuthException
 import com.flyfishxu.kadb.pair.SslUtils
@@ -26,6 +25,7 @@ import javax.net.ssl.SSLProtocolException
 import kotlin.Throws
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+
 
 internal class AdbConnection internal constructor(
     adbReader: AdbReader,
@@ -110,7 +110,7 @@ internal class AdbConnection internal constructor(
             adbWriter.writeConnect()
 
             var message: AdbMessage = try {
-                adbReader.readMessage() // TODO: Handle Connection Reset
+                adbReader.readMessage()
             } catch (e: SSLProtocolException) {
                 if (e.message?.contains("SSLV3_ALERT_CERTIFICATE_UNKNOWN") == true) {
                     throw AdbPairAuthException()
@@ -122,15 +122,23 @@ internal class AdbConnection internal constructor(
             if (message.command == AdbProtocol.CMD_STLS) {
                 val host = (socketChannel.remoteAddress as InetSocketAddress).hostName
                 val port = (socketChannel.remoteAddress as InetSocketAddress).port
-                val newSocketChannel = SocketChannel.open()
-                newSocketChannel.configureBlocking(true)
-                newSocketChannel.connect(InetSocketAddress(host, port))
 
-                // Todo: Change to SocketChannel
-                val sslSocket = SslUtils.getSSLSocket(newSocketChannel, host, port, loadKeyPair())
+                // Create the TlsChannel
+                val tlsChannel = SslUtils.getTlsChannel(socketChannel, host, port, keyPair)
+
+                val newSource = Channels.newInputStream(tlsChannel).source()
+                val newSink = Channels.newOutputStream(tlsChannel).sink()
+
                 adbReader.close()
                 adbWriter.close()
-                return connect(sslSocket, keyPair)
+
+                return connect(
+                    socketChannel,
+                    AdbReader(newSource),
+                    AdbWriter(newSink),
+                    keyPair,
+                    closeable
+                )
             } else if (message.command == AdbProtocol.CMD_AUTH) {
                 check(message.arg0 == AdbProtocol.AUTH_TYPE_TOKEN) { "Unsupported auth type: $message" }
 
@@ -157,7 +165,6 @@ internal class AdbConnection internal constructor(
 
         private data class ConnectionString(val features: Set<String>)
 
-        // ie: "device::ro.product.name=sdk_gphone_x86;ro.product.model=Android SDK built for x86;ro.product.device=generic_x86;features=fixed_push_symlink_timestamp,apex,fixed_push_mkdir,stat_v2,abb_exec,cmd,abb,shell_v2"
         private fun parseConnectionString(connectionString: String): ConnectionString {
             val keyValues = connectionString.substringAfter("device::").split(";").map { it.split("=") }
                 .mapNotNull { if (it.size != 2) null else it[0] to it[1] }.toMap()
@@ -167,7 +174,6 @@ internal class AdbConnection internal constructor(
         }
     }
 }
-
 
 /*** ADB RSA Public Key Transformation Section ***/
 private const val KEY_LENGTH_BITS = 2048

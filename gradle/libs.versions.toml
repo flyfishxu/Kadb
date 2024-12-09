@@ -36,3 +36,4 @@ okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }
 conscrypt-java = { module = "org.conscrypt:conscrypt-openjdk-uber", version.ref = "conscrypt-java" }
+tls-channel = { module = "com.github.marianobarrios:tls-channel", version = "0.9.1" }

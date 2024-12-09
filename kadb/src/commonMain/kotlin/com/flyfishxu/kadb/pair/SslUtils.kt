@@ -17,57 +17,41 @@
 package com.flyfishxu.kadb.pair
 
 import com.flyfishxu.kadb.cert.AdbKeyPair
-import com.flyfishxu.kadb.core.AdbProtocol
-import okio.BufferedSink
-import okio.buffer
-import okio.sink
+import tlschannel.ClientTlsChannel
+import tlschannel.TlsChannel
+import java.net.InetSocketAddress
 import java.net.Socket
-import java.nio.channels.Channels
 import java.nio.channels.SocketChannel
 import java.security.*
 import java.security.cert.X509Certificate
-import java.util.concurrent.TimeUnit
-import javax.net.ssl.*
+import javax.net.ssl.KeyManager
+import javax.net.ssl.SSLContext
+import javax.net.ssl.X509ExtendedKeyManager
+import javax.net.ssl.X509TrustManager
 
 internal object SslUtils {
     var customConscrypt = false
     private var sslContext: SSLContext? = null
 
     // TODO
-    fun getSSLSocket(
+    fun getTlsChannel(
         socketChannel: SocketChannel, host: String?, port: Int, keyPair: AdbKeyPair?
-    ): SSLSocket {
-        val sink: BufferedSink = Channels.newOutputStream(socketChannel).sink().buffer()
-
-        sink.write(AdbProtocol.generateStls())
-        sink.flush()
-
+    ): TlsChannel {
+        // Initialize SSLContext using the given keyPair
         val sslContext = keyPair?.let { getSslContext(it) }
-        var tlsSocket: SSLSocket? = null
-        var retryCount = 0
-        val maxRetries = 3
 
-        while (retryCount < maxRetries) {
-            try {
-                tlsSocket = sslContext?.socketFactory?.createSocket(
-                    socketChannel,
-                    host,
-                    port,
-                    true
-                ) as SSLSocket
-                tlsSocket.startHandshake()
-                break
-            } catch (e: SSLHandshakeException) {
-                retryCount++
-                if (retryCount == maxRetries) {
-                    throw e
-                } else {
-                    TimeUnit.SECONDS.sleep(1)
-                }
-            }
+        val rawChannel = socketChannel
+        if (!rawChannel.isConnected) {
+            rawChannel.connect(InetSocketAddress(host, port))
         }
-        return tlsSocket!!
+
+        // Create TlsChannel builder with the raw channel and the SSLContext
+        val builder = ClientTlsChannel.newBuilder(rawChannel, sslContext)
+
+        // Instantiate and return the TlsChannel
+        return builder.build()
     }
+
 
     fun getSslContext(keyPair: AdbKeyPair): SSLContext {
         sslContext?.let { return it }

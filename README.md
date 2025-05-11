@@ -5,7 +5,7 @@ A Kotlin Multiplatform library to connect Android devices without ADB server.
 Kadb offers a wide range of features, including wireless debugging, apk sideloading, file management, port forwarding,
 and shell command execution. Wireless debugging without relying on `adb` binary.
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.flyfishxu/kadb.svg)](https://mvnrepository.com/artifact/com.flyfishxu/kadb)
+[![Maven Central](https://img.shields.io/maven-central/v/com.flyfishxu/kadb.svg)](https://mvnrepository.com/artifact/com.flyfishxu/kadb) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/flyfishxu/Kadb)
 
 ## Getting Started
 

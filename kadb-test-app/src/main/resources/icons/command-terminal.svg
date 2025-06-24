@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Terminal window background -->
+  <rect x="4" y="8" width="40" height="32" rx="4" fill="#263238" stroke="#37474F" stroke-width="2"/>
+  
+  <!-- Terminal title bar -->
+  <rect x="4" y="8" width="40" height="6" rx="4" fill="#37474F"/>
+  <rect x="4" y="11" width="40" height="3" fill="#37474F"/>
+  
+  <!-- Window control buttons -->
+  <circle cx="10" cy="11" r="1.5" fill="#F44336"/>
+  <circle cx="14" cy="11" r="1.5" fill="#FF9800"/>
+  <circle cx="18" cy="11" r="1.5" fill="#4CAF50"/>
+  
+  <!-- Command prompt -->
+  <text x="8" y="22" font-family="monospace" font-size="8" fill="#4CAF50" font-weight="bold">$</text>
+  
+  <!-- Command text -->
+  <text x="12" y="22" font-family="monospace" font-size="6" fill="#E0E0E0">adb shell echo "Hello"</text>
+  
+  <!-- Cursor blinking -->
+  <rect x="36" y="19" width="1" height="6" fill="#E0E0E0">
+    <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Output result -->
+  <text x="8" y="30" font-family="monospace" font-size="6" fill="#81C784">Hello</text>
+  
+  <!-- Next line prompt -->
+  <text x="8" y="36" font-family="monospace" font-size="8" fill="#4CAF50" font-weight="bold">$</text>
+  
+  <!-- Code symbol decoration -->
+  <g transform="translate(32, 24)" opacity="0.3">
+    <path d="M2 0L0 2L2 4" stroke="#81C784" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M6 0L8 2L6 4" stroke="#81C784" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M3 1L5 3" stroke="#81C784" stroke-width="1" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Execution status indicator -->
+  <g transform="translate(38, 28)">
+    <circle cx="2" cy="2" r="2" fill="#4CAF50" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.3;0.8" dur="1.5s" repeatCount="indefinite"/>
+    </circle>
+    <path d="M1 2L2 3L3 1" stroke="#FFFFFF" stroke-width="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  
+  <!-- Data flow effect -->
+  <g opacity="0.6">
+    <circle cx="6" cy="26" r="1" fill="#64B5F6">
+      <animateTransform attributeName="transform" type="translate" 
+                        values="0,0; 36,0; 0,0" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;0" dur="3s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg> 

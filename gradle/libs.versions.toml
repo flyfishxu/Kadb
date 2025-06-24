@@ -5,12 +5,14 @@
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 
 [versions]
 
 agp = "8.7.2"
 bc = "1.79"
 jmdns = "3.6.0"
+kotlinxCoroutinesCoreVersion = "1.10.1"
 spake2 = "0.0.5"
 spake2-jvm = "0.9.0"
 kotlin = "2.1.0-RC2"
@@ -21,12 +23,15 @@ documentfile = "1.1.0-alpha01"
 dokka = "2.0.0-Beta"
 hiddenapibypass = "4.3"
 conscrypt-java = "2.5.2"
+compose = "1.7.1"
 
 [libraries]
 
 bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bc" }
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bc" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
+kotlinx-coroutines-core-v1101 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCoreVersion" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinxCoroutinesCore" }
 spake2 = { module = "com.github.flyfishxu.spake2-java:spake2", version.ref = "spake2" }
 spake2-jvm = { module = "com.github.MuntashirAkon:spake2-java", version.ref = "spake2-jvm" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

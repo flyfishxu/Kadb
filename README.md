@@ -68,6 +68,8 @@ Kadb.pair("10.0.0.175", 37755, "643102")
 
 *Note: Pair only works when target device running Android 11 and above*
 
+*Known Issue: Device pairing is currently not available on JVM target, we are working to resolve this issue*
+
 ### Discover a Device
 
 The following discovers and returns a connected device or emulator.

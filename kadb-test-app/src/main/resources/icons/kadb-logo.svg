@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="url(#gradient)" stroke="#1e40af" stroke-width="2"/>
+  
+  <!-- Kotlin K letter design -->
+  <path d="M18 18 L18 46 L26 46 L26 32 L38 46 L48 46 L34 32 L46 18 L36 18 L26 28 L26 18 Z" fill="#ffffff"/>
+  
+  <!-- ADB connection line design -->
+  <!-- Device 1 -->
+  <rect x="8" y="28" width="8" height="8" rx="2" fill="#10b981" stroke="#059669" stroke-width="1">
+    <animate attributeName="fill" values="#10b981;#34d399;#10b981" dur="2s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Device 2 -->
+  <rect x="48" y="28" width="8" height="8" rx="2" fill="#10b981" stroke="#059669" stroke-width="1">
+    <animate attributeName="fill" values="#10b981;#34d399;#10b981" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+  </rect>
+  
+  <!-- Connection line -->
+  <line x1="16" y1="32" x2="48" y2="32" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,2">
+    <animate attributeName="stroke-dashoffset" values="0;-6" dur="1s" repeatCount="indefinite"/>
+  </line>
+  
+  <!-- Data transmission points -->
+  <circle cx="24" cy="32" r="2" fill="#f59e0b">
+    <animate attributeName="cx" values="24;40;24" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="32" cy="32" r="2" fill="#ef4444">
+    <animate attributeName="cx" values="32;48;32" dur="2.5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0.3;1" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Gradient definition -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1e40af"/>
+    </linearGradient>
+  </defs>
+</svg> 

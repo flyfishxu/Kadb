@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="24" cy="24" r="20" fill="#ff4757" opacity="0.9">
+    <animate attributeName="r" values="20;22;20" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Outer warning glow -->
+  <circle cx="24" cy="24" r="20" fill="none" stroke="#ff3742" stroke-width="2" opacity="0.5">
+    <animate attributeName="r" values="20;25;20" dur="1.5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0.2;0.5" dur="1.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- X symbol -->
+  <g stroke="#ffffff" stroke-width="3" stroke-linecap="round">
+    <line x1="16" y1="16" x2="32" y2="32">
+      <animateTransform attributeName="transform" type="scale" values="1;1.1;1" dur="0.8s" repeatCount="indefinite"/>
+    </line>
+    <line x1="32" y1="16" x2="16" y2="32">
+      <animateTransform attributeName="transform" type="scale" values="1;1.1;1" dur="0.8s" repeatCount="indefinite"/>
+    </line>
+  </g>
+  
+  <!-- Vibration effect -->
+  <animateTransform attributeName="transform" type="translate" values="0 0; 1 0; -1 0; 0 0" dur="0.3s" repeatCount="indefinite"/>
+  
+  <!-- Warning flash -->
+  <circle cx="24" cy="24" r="20" fill="#ff6b7d" opacity="0">
+    <animate attributeName="opacity" values="0;0.3;0" dur="1s" repeatCount="indefinite"/>
+  </circle>
+</svg> 

@@ -8,20 +8,19 @@ dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 
 [versions]
-
-agp = "8.7.2"
-bc = "1.79"
-jmdns = "3.6.0"
+agp = "8.11.1"
+bc = "1.81"
+jmdns = "3.6.1"
 kotlinxCoroutinesCoreVersion = "1.10.1"
 spake2 = "0.0.5"
 spake2-jvm = "0.9.0"
-kotlin = "2.1.0-RC2"
-kotlinxCoroutinesCore = "1.9.0"
-nexus-publish = "2.0.0-rc-1"
-okio = "3.9.1"
-documentfile = "1.1.0-alpha01"
-dokka = "2.0.0-Beta"
-hiddenapibypass = "4.3"
+kotlin = "2.2.10"
+kotlinxCoroutinesCore = "1.10.2"
+nexus-publish = "2.0.0"
+okio = "3.16.0"
+documentfile = "1.1.0"
+dokka = "2.0.0"
+hiddenapibypass = "6.1"
 conscrypt-java = "2.5.2"
 compose = "1.7.1"
 

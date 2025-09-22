@@ -39,6 +39,10 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
         AdbProtocol.CMD_AUTH, authType, 0, authPayload, 0, authPayload.size
     )
 
+    fun writeStls(version: Int) = write(
+        AdbProtocol.CMD_STLS, version, 0, null, 0, 0
+    )
+
     fun writeOpen(localId: Int, destination: String) {
         val destinationBytes = destination.toByteArray()
         val buffer = ByteBuffer.allocate(destinationBytes.size + 1)

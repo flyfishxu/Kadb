@@ -9,13 +9,13 @@ import com.flyfishxu.kadb.shell.AdbShellResponse
 import com.flyfishxu.kadb.shell.AdbShellStream
 import com.flyfishxu.kadb.stream.AdbStream
 import com.flyfishxu.kadb.stream.AdbSyncStream
+import com.flyfishxu.kadb.transport.TransportChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
 import okio.*
 import java.io.File
 import java.io.IOException
-import java.net.InetSocketAddress
-import java.net.Socket
 import kotlin.Throws
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
@@ -26,11 +26,9 @@ class Kadb(
     private val socketTimeout: Int = 0
 ) : AutoCloseable {
 
-    private var connection: Pair<AdbConnection, Socket>? = null
+    private var connection: Pair<AdbConnection, TransportChannel>? = null
 
-    fun connectionCheck(): Boolean {
-        return connection?.second?.isConnected == true
-    }
+    fun connectionCheck(): Boolean = connection?.second?.isOpen == true
 
     fun open(destination: String): AdbStream {
         val conn = connection ?: newConnection().also { connection = it }
@@ -132,25 +130,21 @@ class Kadb(
     }
 
     private fun connection(): AdbConnection {
-        val conn = connection
-        return if (conn == null || conn.second.isClosed) {
+        val current = connection
+        return if (current == null || !current.second.isOpen) {
             newConnection().also { connection = it }.first
-        } else conn.first
+        } else current.first
     }
 
-    private fun newConnection(): Pair<AdbConnection, Socket> {
+    private fun newConnection(): Pair<AdbConnection, TransportChannel> {
         var attempt = 0
         while (true) {
             attempt++
             try {
-                val socketAddress = InetSocketAddress(host, port)
-                val socket = Socket().apply {
-                    soTimeout = socketTimeout
-                    keepAlive = true
-                    connect(socketAddress, connectTimeout)
+                val result = runBlocking {
+                    AdbConnection.connect(host, port, loadKeyPair(), connectTimeout, socketTimeout)
                 }
-                val adbConnection = AdbConnection.connect(socket, loadKeyPair())
-                return adbConnection to socket
+                return result
             } catch (e: Exception) {
                 println("CONNECT LOST; TRYING TO REBUILD SOCKET $attempt TIMES")
                 if (attempt >= 5) throw e

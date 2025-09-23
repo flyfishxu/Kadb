@@ -29,7 +29,8 @@ internal object SslUtils {
     fun newClientEngine(sslContext: SSLContext, host: String?, port: Int): SSLEngine {
         val engine = if (host != null) sslContext.createSSLEngine(host, port) else sslContext.createSSLEngine()
         engine.useClientMode = true
-        engine.enabledProtocols = arrayOf("TLSv1.3", "TLSv1.2")
+        // adbd 端强制 TLS 1.3
+        engine.enabledProtocols = arrayOf("TLSv1.3")
         return engine
     }
 
@@ -62,7 +63,7 @@ internal object SslUtils {
             override fun getClientAliases(
                 keyType: String?, issuers: Array<out Principal>?
             ): Array<String>? {
-                return null
+                return if (keyType?.equals("RSA", ignoreCase = true) == true) arrayOf(mAlias) else arrayOf(mAlias)
             }
 
             override fun chooseClientAlias(
@@ -71,7 +72,13 @@ internal object SslUtils {
                 keyTypes?.let {
                     if (it.contains("RSA")) return mAlias
                 }
-                return null
+                return if (keyTypes?.any { it.equals("RSA", ignoreCase = true) } == true) mAlias else mAlias
+            }
+
+            override fun chooseEngineClientAlias(
+                keyTypes: Array<out String>?, issuers: Array<out Principal>?, engine: SSLEngine?
+            ): String? {
+                return if (keyTypes?.any { it.equals("RSA", ignoreCase = true) } == true) mAlias else mAlias
             }
 
             override fun getServerAliases(

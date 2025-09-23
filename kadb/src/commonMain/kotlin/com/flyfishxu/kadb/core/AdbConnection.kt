@@ -2,7 +2,6 @@ package com.flyfishxu.kadb.core
 
 import com.flyfishxu.kadb.cert.AdbKeyPair
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
-import com.flyfishxu.kadb.exception.AdbPairAuthException
 import com.flyfishxu.kadb.pair.SslUtils
 import com.flyfishxu.kadb.queue.AdbMessageQueue
 import com.flyfishxu.kadb.stream.AdbStream
@@ -11,6 +10,7 @@ import com.flyfishxu.kadb.transport.TransportChannel
 import com.flyfishxu.kadb.transport.TransportFactory
 import com.flyfishxu.kadb.transport.asOkioSink
 import com.flyfishxu.kadb.transport.asOkioSource
+import com.flyfishxu.kadb.tls.TlsErrorMapper
 import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.IOException
@@ -96,11 +96,7 @@ internal class AdbConnection internal constructor(
                 var message: AdbMessage = try {
                     reader.readMessage()
                 } catch (e: SSLProtocolException) {
-                    if (e.message?.contains("SSLV3_ALERT_CERTIFICATE_UNKNOWN") == true) {
-                        throw AdbPairAuthException()
-                    } else {
-                        throw e
-                    }
+                    throw TlsErrorMapper.map(e)
                 }
 
                 while (true) {
@@ -110,7 +106,11 @@ internal class AdbConnection internal constructor(
                             val sslContext = SslUtils.getSslContext(keyPair)
                             val engine = SslUtils.newClientEngine(sslContext, host, port)
                             val tlsChannel = TlsNioChannel(channel, engine)
-                            tlsChannel.handshake(ioTimeout, TimeUnit.MILLISECONDS)
+                            try {
+                                tlsChannel.handshake(ioTimeout, TimeUnit.MILLISECONDS)
+                            } catch (t: Throwable) {
+                                throw TlsErrorMapper.map(t)
+                            }
 
                             reader.close()
                             writer.close()

@@ -15,6 +15,7 @@
 
 package com.flyfishxu.kadb.transport
 
+import kotlinx.coroutines.runBlocking
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLEngine
@@ -106,6 +107,8 @@ internal class TlsNioChannel(
                 }
             }
         }
+
+        resizeIfNeeded()
     }
 
     override suspend fun read(dst: ByteBuffer, timeout: Long, unit: TimeUnit): Int {
@@ -200,7 +203,26 @@ internal class TlsNioChannel(
 
     override val isOpen get() = net.isOpen
 
-    override fun close() = net.close()
+    override fun close() {
+        try {
+            engine.closeOutbound()
+            netOut.clear()
+            val result = try {
+                engine.wrap(EMPTY.duplicate(), netOut)
+            } catch (_: Throwable) {
+                null
+            }
+            if (result != null && result.status == SSLEngineResult.Status.OK && netOut.position() > 0) {
+                netOut.flip()
+                runCatching {
+                    runBlocking { net.writeExactly(netOut, 1_000, TimeUnit.MILLISECONDS) }
+                }
+            }
+        } catch (_: Throwable) {
+        } finally {
+            net.close()
+        }
+    }
 
     private fun enlarge(buffer: ByteBuffer, minimum: Int): ByteBuffer {
         val capacity = maxOf(buffer.capacity() * 2, minimum)
@@ -208,6 +230,20 @@ internal class TlsNioChannel(
         buffer.flip()
         newBuffer.put(buffer)
         return newBuffer
+    }
+
+    private fun resizeIfNeeded() {
+        val packet = engine.session.packetBufferSize
+        val app = engine.session.applicationBufferSize
+        if (netIn.capacity() < packet) {
+            netIn = enlarge(netIn, packet)
+        }
+        if (netOut.capacity() < packet) {
+            netOut = enlarge(netOut, packet)
+        }
+        if (appIn.capacity() < app) {
+            appIn = enlarge(appIn, app)
+        }
     }
 
     private companion object {

@@ -33,9 +33,8 @@ internal class PlainNioChannel private constructor(
 
     companion object {
         suspend fun connect(host: String, port: Int, timeout: Long, unit: TimeUnit): PlainNioChannel {
-            val ch = AsynchronousSocketChannel.open()
-            ch.setOption(StandardSocketOptions.TCP_NODELAY, true)
-            ch.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
+            val group = TransportRuntime.channelGroup
+            val ch = if (group != null) AsynchronousSocketChannel.open(group) else AsynchronousSocketChannel.open()
             try {
                 suspend fun doConnect() {
                     suspendCancellableCoroutine<Unit> { cont ->
@@ -60,6 +59,11 @@ internal class PlainNioChannel private constructor(
                     withTimeout(unit.toMillis(timeout)) { doConnect() }
                 } else {
                     doConnect()
+                }
+                try {
+                    ch.setOption(StandardSocketOptions.TCP_NODELAY, true)
+                    ch.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
+                } catch (_: Throwable) {
                 }
             } catch (t: Throwable) {
                 try {

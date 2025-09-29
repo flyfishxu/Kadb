@@ -1,7 +1,7 @@
 package com.flyfishxu.kadb.pair
 
-import io.github.muntashirakon.crypto.spake2.Spake2Context
-import io.github.muntashirakon.crypto.spake2.Spake2Role
+import com.flyfish233.crypto.spake2.Spake2Context
+import com.flyfish233.crypto.spake2.Spake2Role
 import org.bouncycastle.crypto.InvalidCipherTextException
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.engines.AESEngine

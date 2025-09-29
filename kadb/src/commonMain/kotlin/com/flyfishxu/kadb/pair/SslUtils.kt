@@ -17,45 +17,21 @@
 package com.flyfishxu.kadb.pair
 
 import com.flyfishxu.kadb.cert.AdbKeyPair
-import com.flyfishxu.kadb.core.AdbProtocol
-import okio.BufferedSink
-import okio.buffer
-import okio.sink
 import java.net.Socket
 import java.security.*
 import java.security.cert.X509Certificate
-import java.util.concurrent.TimeUnit
 import javax.net.ssl.*
 
 internal object SslUtils {
     var customConscrypt = false
     private var sslContext: SSLContext? = null
 
-    fun getSSLSocket(
-        socket: Socket, host: String?, port: Int, keyPair: AdbKeyPair?
-    ): SSLSocket {
-        val sink: BufferedSink = socket.sink().buffer()
-        sink.write(AdbProtocol.generateStls())
-        sink.flush()
-
-        val sslContext = keyPair?.let { getSslContext(it) }
-        var tlsSocket: SSLSocket? = null
-        var retryCount = 0
-        val maxRetries = 3
-
-        while (retryCount < maxRetries) try {
-            tlsSocket = sslContext?.socketFactory?.createSocket(socket, host, port, true) as SSLSocket
-            tlsSocket.startHandshake()
-            break
-        } catch (e: SSLHandshakeException) {
-            retryCount++
-            if (retryCount == maxRetries) {
-                throw e
-            } else {
-                TimeUnit.SECONDS.sleep(1)
-            }
-        }
-        return tlsSocket!!
+    fun newClientEngine(sslContext: SSLContext, host: String?, port: Int): SSLEngine {
+        val engine = if (host != null) sslContext.createSSLEngine(host, port) else sslContext.createSSLEngine()
+        engine.useClientMode = true
+        // adbd 端强制 TLS 1.3
+        engine.enabledProtocols = arrayOf("TLSv1.3")
+        return engine
     }
 
     fun getSslContext(keyPair: AdbKeyPair): SSLContext {
@@ -84,7 +60,7 @@ internal object SslUtils {
             override fun getClientAliases(
                 keyType: String?, issuers: Array<out Principal>?
             ): Array<String>? {
-                return null
+                return if (keyType?.equals("RSA", ignoreCase = true) == true) arrayOf(mAlias) else arrayOf(mAlias)
             }
 
             override fun chooseClientAlias(
@@ -93,7 +69,13 @@ internal object SslUtils {
                 keyTypes?.let {
                     if (it.contains("RSA")) return mAlias
                 }
-                return null
+                return if (keyTypes?.any { it.equals("RSA", ignoreCase = true) } == true) mAlias else mAlias
+            }
+
+            override fun chooseEngineClientAlias(
+                keyTypes: Array<out String>?, issuers: Array<out Principal>?, engine: SSLEngine?
+            ): String? {
+                return if (keyTypes?.any { it.equals("RSA", ignoreCase = true) } == true) mAlias else mAlias
             }
 
             override fun getServerAliases(

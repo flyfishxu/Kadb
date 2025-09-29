@@ -34,9 +34,6 @@ internal object SslUtils {
         return engine
     }
 
-    @Deprecated("Use SSLEngine via TlsNioChannel; STLS must upgrade in-place, not by creating a new socket")
-    fun getSSLSocket(): Nothing = error("Deprecated: use SSLEngine + TlsNioChannel")
-
     fun getSslContext(keyPair: AdbKeyPair): SSLContext {
         sslContext?.let { return it }
         try {

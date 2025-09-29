@@ -36,7 +36,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation(libs.spake2.jvm)
+                implementation(libs.spake2)
                 implementation(libs.jmdns)
             }
         }

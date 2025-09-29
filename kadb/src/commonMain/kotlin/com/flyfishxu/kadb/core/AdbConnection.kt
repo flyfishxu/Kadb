@@ -1,25 +1,25 @@
 package com.flyfishxu.kadb.core
 
 import com.flyfishxu.kadb.cert.AdbKeyPair
-import com.flyfishxu.kadb.cert.CertUtils.loadKeyPair
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
-import com.flyfishxu.kadb.exception.AdbPairAuthException
 import com.flyfishxu.kadb.pair.SslUtils
 import com.flyfishxu.kadb.queue.AdbMessageQueue
 import com.flyfishxu.kadb.stream.AdbStream
-import okio.Sink
-import okio.Source
-import okio.sink
-import okio.source
+import com.flyfishxu.kadb.transport.TlsNioChannel
+import com.flyfishxu.kadb.transport.TransportChannel
+import com.flyfishxu.kadb.transport.TransportFactory
+import com.flyfishxu.kadb.transport.asOkioSink
+import com.flyfishxu.kadb.transport.asOkioSource
+import com.flyfishxu.kadb.tls.TlsErrorMapper
 import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.IOException
 import java.math.BigInteger
-import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.interfaces.RSAPublicKey
 import java.util.*
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLProtocolException
 import kotlin.Throws
 import kotlin.io.encoding.Base64
@@ -76,79 +76,102 @@ internal class AdbConnection internal constructor(
     }
 
     companion object {
-        fun connect(socket: Socket, keyPair: AdbKeyPair): AdbConnection {
-            val source = socket.source()
-            val sink = socket.sink()
-            return connect(socket, source, sink, keyPair, socket)
-        }
+        suspend fun connect(
+            host: String,
+            port: Int,
+            keyPair: AdbKeyPair,
+            connectTimeoutMs: Int = 10_000,
+            ioTimeoutMs: Int = 0
+        ): Pair<AdbConnection, TransportChannel> {
+            val connectTimeout = connectTimeoutMs.toLong()
+            val ioTimeout = ioTimeoutMs.toLong()
 
-        private fun connect(
-            socket: Socket, source: Source, sink: Sink, keyPair: AdbKeyPair, closeable: Closeable? = null
-        ): AdbConnection {
-            val adbReader = AdbReader(source)
-            val adbWriter = AdbWriter(sink)
+            var channel: TransportChannel = TransportFactory.connect(host, port, connectTimeout)
+            var reader = AdbReader(channel.asOkioSource(ioTimeout))
+            var writer = AdbWriter(channel.asOkioSink(ioTimeout))
 
             try {
-                return connect(socket, adbReader, adbWriter, keyPair, closeable)
+                writer.writeConnect()
+
+                var message: AdbMessage = try {
+                    reader.readMessage()
+                } catch (e: SSLProtocolException) {
+                    throw TlsErrorMapper.map(e)
+                }
+
+                while (true) {
+                    when (message.command) {
+                        AdbProtocol.CMD_STLS -> {
+                            writer.writeStls(message.arg0)
+                            val sslContext = SslUtils.getSslContext(keyPair)
+                            val engine = SslUtils.newClientEngine(sslContext, host, port)
+                            val tlsChannel = TlsNioChannel(channel, engine)
+                            try {
+                                tlsChannel.handshake(ioTimeout, TimeUnit.MILLISECONDS)
+                            } catch (t: Throwable) {
+                                throw TlsErrorMapper.map(t)
+                            }
+
+                            reader.close()
+                            writer.close()
+
+                            channel = tlsChannel
+                            reader = AdbReader(channel.asOkioSource(ioTimeout))
+                            writer = AdbWriter(channel.asOkioSink(ioTimeout))
+                            message = reader.readMessage()
+                        }
+
+                        AdbProtocol.CMD_AUTH -> {
+                            check(message.arg0 == AdbProtocol.AUTH_TYPE_TOKEN) { "Unsupported auth type: $message" }
+                            val signature = keyPair.signPayload(message)
+                            writer.writeAuth(AdbProtocol.AUTH_TYPE_SIGNATURE, signature)
+                            message = reader.readMessage()
+                            if (message.command == AdbProtocol.CMD_AUTH) {
+                                writer.writeAuth(AdbProtocol.AUTH_TYPE_RSA_PUBLIC, adbPublicKey(keyPair))
+                                message = reader.readMessage()
+                            }
+                        }
+
+                        AdbProtocol.CMD_CNXN -> break
+
+                        else -> throw IOException("Connection failed: $message")
+                    }
+                }
+
+                val connectionString = parseConnectionString(String(message.payload))
+                val version = message.arg0
+                val maxPayloadSize = message.arg1
+
+                val connection = AdbConnection(
+                    reader,
+                    writer,
+                    channel,
+                    connectionString.features,
+                    version,
+                    maxPayloadSize
+                )
+
+                return connection to channel
             } catch (t: Throwable) {
-                adbReader.close()
-                adbWriter.close()
+                try {
+                    reader.close()
+                } catch (_: Throwable) {
+                }
+                try {
+                    writer.close()
+                } catch (_: Throwable) {
+                }
+                try {
+                    channel.close()
+                } catch (_: Throwable) {
+                }
                 throw t
             }
         }
 
-        private fun connect(
-            socket: Socket, adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair, closeable: Closeable?
-        ): AdbConnection {
-            adbWriter.writeConnect()
-
-            var message: AdbMessage = try {
-                adbReader.readMessage() // TODO：Happened Connection Reset
-            } catch (e: SSLProtocolException) {
-                if (e.message?.contains("SSLV3_ALERT_CERTIFICATE_UNKNOWN") == true) {
-                    throw AdbPairAuthException()
-                } else {
-                    throw e
-                }
-            }
-
-            if (message.command == AdbProtocol.CMD_STLS) {
-                val host = socket.inetAddress.hostAddress!!
-                val port = socket.port
-                val newSocket = Socket(host, port)
-                val sslSocket = SslUtils.getSSLSocket(
-                    newSocket, host, port, loadKeyPair()
-                )
-                adbReader.close()
-                adbWriter.close()
-                return connect(sslSocket, keyPair)
-            } else if (message.command == AdbProtocol.CMD_AUTH) {
-                check(message.arg0 == AdbProtocol.AUTH_TYPE_TOKEN) { "Unsupported auth type: $message" }
-
-                val signature = keyPair.signPayload(message)
-                adbWriter.writeAuth(AdbProtocol.AUTH_TYPE_SIGNATURE, signature)
-
-                message = adbReader.readMessage()
-                if (message.command == AdbProtocol.CMD_AUTH) {
-                    adbWriter.writeAuth(AdbProtocol.AUTH_TYPE_RSA_PUBLIC, adbPublicKey(keyPair))
-                    message = adbReader.readMessage()
-                }
-            }
-
-            if (message.command != AdbProtocol.CMD_CNXN) throw IOException("Connection failed: ${message.command}")
-
-            val connectionString = parseConnectionString(String(message.payload))
-            val version = message.arg0
-            val maxPayloadSize = message.arg1
-
-            return AdbConnection(
-                adbReader, adbWriter, closeable, connectionString.features, version, maxPayloadSize
-            )
-        }
-
         private data class ConnectionString(val features: Set<String>)
 
-        // ie: "device::ro.product.name=sdk_gphone_x86;ro.product.model=Android SDK built for x86;ro.product.device=generic_x86;features=fixed_push_symlink_timestamp,apex,fixed_push_mkdir,stat_v2,abb_exec,cmd,abb,shell_v2"
+        // ie: "device::ro.product.name=sdk_gphone_x86;ro.product.model=Android SDK built for x86;ro.product.device=generic_x86;,features=fixed_push_symlink_timestamp,apex,fixed_push_mkdir,stat_v2,abb_exec,cmd,abb,shell_v2"
         private fun parseConnectionString(connectionString: String): ConnectionString {
             val keyValues = connectionString.substringAfter("device::").split(";").map { it.split("=") }
                 .mapNotNull { if (it.size != 2) null else it[0] to it[1] }.toMap()

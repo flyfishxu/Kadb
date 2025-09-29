@@ -12,8 +12,7 @@ agp = "8.13.0"
 bc = "1.82"
 jmdns = "3.6.2"
 kotlinxCoroutinesCoreVersion = "1.10.2"
-spake2 = "0.0.5"
-spake2-jvm = "0.9.0"
+spake2 = "1.0.1"
 kotlin = "2.2.20"
 kotlinxCoroutinesCore = "1.10.2"
 nexus-publish = "2.0.0"
@@ -25,13 +24,13 @@ conscrypt-java = "2.5.2"
 compose = "1.7.1"
 
 [libraries]
+
 bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bc" }
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bc" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
 kotlinx-coroutines-core-v1101 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCoreVersion" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinxCoroutinesCore" }
-spake2 = { module = "com.github.flyfishxu.spake2-java:spake2", version.ref = "spake2" }
-spake2-jvm = { module = "com.github.MuntashirAkon:spake2-java", version.ref = "spake2-jvm" }
+spake2 = { module = "ccom.github.flyfish233:spake2-java", version.ref = "spake2" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
 nexus-publish = { module = "io.github.gradle-nexus.publish-plugin:io.github.gradle-nexus.publish-plugin.gradle.plugin", version.ref = "nexus-publish" }

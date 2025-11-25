@@ -9,26 +9,26 @@ compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "
 compose = { id = "org.jetbrains.compose", version.ref = "compose"}
 
 [versions]
-agp = "8.13.0"
+agp = "8.13.1"
 bc = "1.82"
 jmdns = "3.6.2"
-spake2 = "1.0.1"
-kotlin = "2.2.20"
+spake2 = "1.0.5"
+kotlin = "2.2.21"
 kotlinxCoroutinesCore = "1.10.2"
 nexus-publish = "2.0.0"
-okio = "3.16.0"
+okio = "3.16.4"
 documentfile = "1.1.0"
-dokka = "2.1.0-Beta"
+dokka = "2.1.0"
 hiddenapibypass = "6.1"
 conscrypt-java = "2.5.2"
-compose = "1.9.0"
+compose = "1.9.3"
 
 [libraries]
 
 bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bc" }
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bc" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
-spake2 = { module = "ccom.github.flyfish233:spake2-java", version.ref = "spake2" }
+spake2 = { module = "com.github.Flyfish233:spake2-java", version.ref = "spake2" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinxCoroutinesCore" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }

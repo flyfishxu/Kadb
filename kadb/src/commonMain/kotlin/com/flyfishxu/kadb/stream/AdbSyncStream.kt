@@ -33,6 +33,9 @@ private const val DONE = "DONE"
 private const val OKAY = "OKAY"
 private const val QUIT = "QUIT"
 private const val FAIL = "FAIL"
+// AOSP file sync caps each DATA chunk to 64 KiB.
+// https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/file_sync_protocol.h
+private const val SYNC_DATA_MAX = 64 * 1024
 
 internal val SYNC_IDS = setOf(LIST, RECV, SEND, STAT, DATA, DONE, OKAY, QUIT, FAIL)
 
@@ -58,7 +61,7 @@ class AdbSyncStream(
         buffer.clear()
 
         while (true) {
-            val read = source.read(buffer, 64_000)
+            val read = source.read(buffer, SYNC_DATA_MAX.toLong())
             if (read == -1L) break
             writePacket(DATA, read.toInt())
             val sent = stream.sink.writeAll(buffer)
@@ -96,6 +99,11 @@ class AdbSyncStream(
             when (packet.id) {
                 DATA -> {
                     val chunkSize = packet.arg
+                    // AOSP sync client rejects daemon frames that exceed SYNC_DATA_MAX.
+                    // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/file_sync_client.cpp#1129
+                    if (chunkSize < 0 || chunkSize > SYNC_DATA_MAX) {
+                        throw IOException("Sync DATA chunk too large: $chunkSize > $SYNC_DATA_MAX")
+                    }
                     stream.source.readFully(buffer, chunkSize.toLong())
                     buffer.readAll(sink)
                 }

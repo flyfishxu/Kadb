@@ -44,7 +44,9 @@ internal actual class PairingAuthCtx(
 
     actual fun initCipher(theirMsg: ByteArray?): Boolean {
         if (mIsDestroyed) return false
-        val keyMaterial = mSpake2Ctx.processMessage(theirMsg)
+        // AOSP returns false when peer SPAKE2 processing fails.
+        // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/pairing_auth/pairing_auth.cpp#154
+        val keyMaterial = mSpake2Ctx.processMessage(theirMsg) ?: return false
         val hkdf = HKDFBytesGenerator(SHA256Digest())
         hkdf.init(HKDFParameters(keyMaterial, null, INFO))
         hkdf.generateBytes(mSecretKey, 0, mSecretKey.size)

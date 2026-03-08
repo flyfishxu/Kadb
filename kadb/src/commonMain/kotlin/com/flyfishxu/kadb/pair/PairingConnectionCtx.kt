@@ -229,15 +229,15 @@ internal class PairingConnectionCtx(
     override fun close() {
         Arrays.fill(mPwd, 0.toByte())
         try {
-            mInputStream!!.close()
+            mInputStream?.close()
         } catch (_: IOException) {
         }
         try {
-            mOutputStream!!.close()
+            mOutputStream?.close()
         } catch (_: IOException) {
         }
         if (mState != State.Ready) {
-            mPairingAuthCtx!!.destroy()
+            mPairingAuthCtx?.destroy()
         }
     }
 
@@ -267,7 +267,9 @@ internal class PairingConnectionCtx(
         companion object {
             const val MAX_PEER_INFO_SIZE = 1 shl 13
             const val ADB_RSA_PUB_KEY: Byte = 0
-            const val ADB_DEVICE_GUID: Byte = 0
+            // AOSP pairing PeerInfoType uses 1 for ADB_DEVICE_GUID.
+            // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/pairing_connection/include/adb/pairing/pairing_connection.h#50
+            const val ADB_DEVICE_GUID: Byte = 1
             fun readFrom(buffer: ByteBuffer): PeerInfo {
                 val type = buffer.get()
                 val data = ByteArray(MAX_PEER_INFO_SIZE - 1)

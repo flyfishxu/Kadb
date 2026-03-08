@@ -31,7 +31,7 @@ internal class AdbConnection internal constructor(
     private val closeable: Closeable?,
     private val supportedFeatures: Set<String>,
     private val version: Int,
-    private val maxPayloadSize: Int
+    private val outboundMaxPayloadSize: Int
 ) : AutoCloseable {
 
     private val random = Random()
@@ -46,7 +46,7 @@ internal class AdbConnection internal constructor(
             val message = messageQueue.take(localId, AdbProtocol.CMD_OKAY)
             val remoteId = message.arg0
 
-            return AdbStream(messageQueue, adbWriter, maxPayloadSize, localId, remoteId)
+            return AdbStream(messageQueue, adbWriter, outboundMaxPayloadSize, localId, remoteId)
         } catch (e: Throwable) {
             messageQueue.stopListening(localId)
             throw e
@@ -58,7 +58,13 @@ internal class AdbConnection internal constructor(
     }
 
     private fun newId(): Int {
-        return random.nextInt()
+        var id: Int
+        do {
+            id = random.nextInt()
+            // local-id must be non-zero per protocol.
+            // https://android.googlesource.com/platform/system/core/+/dd7bc3319deb2b77c5d07a51b7d6cd7e11b5beb0/adb/protocol.txt
+        } while (id == 0)
+        return id
     }
 
     @TestOnly
@@ -102,7 +108,9 @@ internal class AdbConnection internal constructor(
                 while (true) {
                     when (message.command) {
                         AdbProtocol.CMD_STLS -> {
-                            writer.writeStls(message.arg0)
+                            // AOSP host always sends STLS with the fixed protocol value A_STLS_VERSION.
+                            // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/adb.cpp#318
+                            writer.writeStls(AdbProtocol.A_STLS_VERSION)
                             val sslContext = SslUtils.getSslContext(keyPair)
                             val engine = SslUtils.newClientEngine(sslContext, host, port)
                             val tlsChannel = TlsNioChannel(channel, engine)
@@ -138,9 +146,34 @@ internal class AdbConnection internal constructor(
                     }
                 }
 
+                // parse_banner() accepts missing features and resets feature set to empty.
+                // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#351
                 val connectionString = parseConnectionString(String(message.payload))
-                val version = message.arg0
-                val maxPayloadSize = message.arg1
+                // Mirror atransport::update_version(): protocol_version = min(peer_version, A_VERSION).
+                // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/transport.cpp#1172
+                val version = minOf(message.arg0, AdbProtocol.A_VERSION)
+                writer.updateProtocolVersion(version)
+                val peerMaxPayloadSize = message.arg1
+                // CNXN arg1 carries the peer's maxdata (its receive limit).
+                // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/adb.cpp
+                if (peerMaxPayloadSize <= 0) {
+                    throw IOException("Peer maxdata must be > 0: $peerMaxPayloadSize")
+                }
+                val localHardCap = AdbProtocol.CONNECT_MAXDATA
+                val negotiatedMaxPayloadSize = minOf(peerMaxPayloadSize, localHardCap)
+                    .coerceAtLeast(1)
+                    .coerceAtMost(localHardCap)
+                // AOSP negotiates max payload as min(peer_max, MAX_PAYLOAD).
+                // https://android.googlesource.com/platform/system/core/+/3d2904c%5E%21/
+                // ADB payload size constants.
+                // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/adb.h
+
+                val inboundMaxPayloadSize = negotiatedMaxPayloadSize
+                val outboundMaxPayloadSize = negotiatedMaxPayloadSize
+                // WRTE payloads must fit within the receiver's maxdata.
+                // https://android.googlesource.com/platform/system/core/+/dd7bc3319deb2b77c5d07a51b7d6cd7e11b5beb0/adb/protocol.txt
+
+                reader.setInboundMaxPayloadSize(inboundMaxPayloadSize)
 
                 val connection = AdbConnection(
                     reader,
@@ -148,7 +181,7 @@ internal class AdbConnection internal constructor(
                     channel,
                     connectionString.features,
                     version,
-                    maxPayloadSize
+                    outboundMaxPayloadSize
                 )
 
                 return connection to channel
@@ -173,10 +206,29 @@ internal class AdbConnection internal constructor(
 
         // ie: "device::ro.product.name=sdk_gphone_x86;ro.product.model=Android SDK built for x86;ro.product.device=generic_x86;,features=fixed_push_symlink_timestamp,apex,fixed_push_mkdir,stat_v2,abb_exec,cmd,abb,shell_v2"
         private fun parseConnectionString(connectionString: String): ConnectionString {
-            val keyValues = connectionString.substringAfter("device::").split(";").map { it.split("=") }
-                .mapNotNull { if (it.size != 2) null else it[0] to it[1] }.toMap()
-            if ("features" !in keyValues) throw IOException("Failed to parse features from connection string: $connectionString")
-            val features = keyValues.getValue("features").split(",").toSet()
+            // parse_banner() splits on ":" and only parses props when pieces.size() > 2.
+            // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#351
+            val pieces = connectionString.split(":")
+            if (pieces.size <= 2) return ConnectionString(emptySet())
+
+            // AOSP resets features to empty first, then fills from "features=" when present.
+            // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#359
+            var features: Set<String> = emptySet()
+            for (prop in pieces[2].split(";")) {
+                if (prop.isEmpty()) continue
+                // Match parse_banner() behavior that keeps only strict key=value pairs.
+                // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#367
+                val delimiter = prop.indexOf('=')
+                if (delimiter <= 0 || delimiter == prop.lastIndex) continue
+                val key = prop.substring(0, delimiter)
+                val value = prop.substring(delimiter + 1)
+                if (key == "features") {
+                    features = value.split(",")
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                        .toSet()
+                }
+            }
             return ConnectionString(features)
         }
     }
@@ -192,10 +244,12 @@ private const val KEY_LENGTH_WORDS = KEY_LENGTH_BYTES / 4
 private fun adbPublicKey(keyPair: AdbKeyPair): ByteArray {
     val pubkey = keyPair.publicKey as RSAPublicKey
     val bytes = convertRsaPublicKeyToAdbFormat(pubkey)
-    return Base64.encodeToByteArray(bytes) + " ${defaultDeviceName()}}".encodeToByteArray()
+    // ADB public key payload is NUL-terminated.
+    // https://android.googlesource.com/platform/system/core/+/android-4.4_r1/adb/adb_auth_host.c
+    return Base64.encodeToByteArray(bytes) + " ${defaultDeviceName()}\u0000".encodeToByteArray()
 }
 
-// https://github.com/cgutman/AdbLib/blob/d6937951eb98557c76ee2081e383d50886ce109a/src/com/cgutman/adblib/AdbCrypto.java#L83-L137
+// https://android.googlesource.com/platform/system/core/+/android-4.4_r1/adb/adb_auth_host.c
 @Suppress("JoinDeclarationAndAssignment")
 private fun convertRsaPublicKeyToAdbFormat(pubkey: RSAPublicKey): ByteArray {/*
      * ADB literally just saves the RSAPublicKey struct to a file.

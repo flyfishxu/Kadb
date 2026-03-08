@@ -9,11 +9,11 @@ compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "
 compose = { id = "org.jetbrains.compose", version.ref = "compose"}
 
 [versions]
-agp = "8.13.1"
-bc = "1.82"
-jmdns = "3.6.2"
+agp = "9.1.0"
+bc = "1.83"
+jmdns = "3.6.3"
 spake2 = "1.0.5"
-kotlin = "2.2.21"
+kotlin = "2.3.10"
 kotlinxCoroutinesCore = "1.10.2"
 nexus-publish = "2.0.0"
 okio = "3.16.4"

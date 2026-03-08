@@ -33,7 +33,6 @@ kotlin {
 
         jvmMain.dependencies {
             implementation(libs.spake2)
-            implementation(libs.jmdns)
         }
 
         commonTest.dependencies {
@@ -43,6 +42,12 @@ kotlin {
         jvmTest.dependencies {
             implementation(libs.conscrypt.java)
         }
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
     }
 }
 
@@ -56,9 +61,11 @@ android {
 
 mavenPublishing {
     publishToMavenCentral()
-    signAllPublications()
+    if (providers.gradleProperty("signAllPublications").map { it.toBoolean() }.orElse(true).get()) {
+        signAllPublications()
+    }
 
-    coordinates("com.flyfishxu", "kadb", "1.3.0")
+    coordinates("com.flyfishxu", "kadb", "2.1.1")
 
     pom {
 

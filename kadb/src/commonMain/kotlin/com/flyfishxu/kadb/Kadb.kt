@@ -114,16 +114,17 @@ class Kadb(
                 check(response.startsWith("Success")) { "Install failed: $response" }
             }
         } else {
-            val tempFile = kotlin.io.path.createTempFile().also {
-                it.sink().buffer().apply { writeAll(source); flush() }
+            val remotePath = "/data/local/tmp/kadb-install-${System.nanoTime()}.apk"
+            try {
+                push(source, remotePath, mode = 420, lastModifiedMs = System.currentTimeMillis())
+                pmInstallRemote(remotePath, *options)
+            } finally {
+                cleanupRemoteTempFile(remotePath)
             }
-            pmInstall(tempFile.toFile(), *options)
         }
     }
 
-    private fun pmInstall(file: File, vararg options: String) {
-        val remotePath = "/data/local/tmp/${file.name}"
-        push(file, remotePath)
+    private fun pmInstallRemote(remotePath: String, vararg options: String) {
         // AOSP install command vectors append only explicit args and quote each arg with escape_arg().
         // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/adb_install.cpp#563
         // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/adb_utils.cpp#81
@@ -131,35 +132,32 @@ class Kadb(
         check(response.allOutput.startsWith("Success")) { "Install failed: ${response.allOutput}" }
     }
 
+    private fun pmInstall(file: File, vararg options: String) {
+        val remotePath = "/data/local/tmp/${file.name}"
+        val mode = readMode(file)
+        val lastModifiedMs = file.lastModified()
+        try {
+            push(file, remotePath, mode = mode, lastModifiedMs = lastModifiedMs)
+            pmInstallRemote(remotePath, *options)
+        } finally {
+            cleanupRemoteTempFile(remotePath)
+        }
+    }
+
     fun installMultiple(apks: List<File>, vararg options: String) {
-        // AOSP uses "package" when abb_exec is supported; otherwise falls back to shell command paths.
-        // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/client/adb_install.cpp#558
-        if (supportsFeature("abb_exec")) {
-            val totalLength = apks.sumOf { it.length() }
-            abbExec("package", "install-create", "-S", totalLength.toString(), *options).use { createStream ->
-                val sessionId = extractSessionId(createStream.source.readUtf8())
-                val error = apks.firstNotNullOfOrNull { apk ->
-                    abbExec(
-                        "package", "install-write", "-S", apk.length().toString(), sessionId, apk.name, "-", *options
-                    ).use { adbStream ->
-                        adbStream.sink.writeAll(apk.source()); adbStream.sink.flush(); adbStream.source.readUtf8()
-                        .takeIf { !it.startsWith("Success") }
-                    }
-                }
-                finalizeSession(sessionId, error, useAbbExec = true, *options)
+        val installOptions = nonBlankOptions(options)
+        val sessionMode = installSessionMode()
+        val sessionId = createInstallSession(apks.sumOf { it.length() }, installOptions, sessionMode)
+        val error = if (sessionMode.usesStreaming) {
+            apks.firstNotNullOfOrNull { apk ->
+                streamInstallWrite(apk, sessionId, sessionMode).takeIf { !it.startsWith("Success") }
             }
         } else {
-            val response = shell(
-                buildShellCommand(
-                    listOf("pm", "install-create", "-S", apks.sumOf { it.length() }.toString()) + nonBlankOptions(options)
-                )
-            )
-            val sessionId = extractSessionId(response.allOutput)
-            val error = apks.mapIndexedNotNull { index, apk ->
+            apks.mapIndexedNotNull { index, apk ->
                 pushAndWrite(apk, sessionId, index).takeIf { !it.startsWith("Success") }
             }.firstOrNull()
-            finalizeSession(sessionId, error, useAbbExec = false)
         }
+        finalizeSession(sessionId, error, sessionMode)
     }
 
     fun uninstall(packageName: String) {
@@ -217,37 +215,109 @@ class Kadb(
     private fun extractSessionId(response: String) =
         """\[(\w+)]""".toRegex().find(response)?.groupValues?.get(1) ?: throw IOException("Failed to create session")
 
-    private fun pushAndWrite(apk: File, sessionId: String, index: Int): String {
-        push(apk, "/data/local/tmp/${apk.name}")
-        // Legacy install-write path uses shell command assembly with escape_arg() for each argv token.
-        // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/adb_install.cpp#570
-        return shell(
-            buildShellCommand(
-                listOf(
-                    "pm",
-                    "install-write",
-                    "-S",
-                    apk.length().toString(),
-                    sessionId,
-                    index.toString(),
-                    "/data/local/tmp/${apk.name}"
-                )
-            )
-        ).allOutput
+    private fun installSessionMode(): InstallSessionMode = when {
+        supportsFeature("abb_exec") -> InstallSessionMode.ABB_EXEC
+        supportsFeature("cmd") -> InstallSessionMode.EXEC_CMD
+        else -> InstallSessionMode.PM_SHELL
     }
 
-    private fun finalizeSession(sessionId: String, error: String?, useAbbExec: Boolean, vararg options: String) {
+    private fun createInstallSession(
+        totalLength: Long,
+        installOptions: List<String>,
+        sessionMode: InstallSessionMode
+    ): String {
+        val response = when (sessionMode) {
+            InstallSessionMode.ABB_EXEC, InstallSessionMode.EXEC_CMD -> {
+                openInstallCommand(
+                    sessionMode,
+                    "package",
+                    "install-create",
+                    "-S",
+                    totalLength.toString(),
+                    *installOptions.toTypedArray()
+                ).use { stream ->
+                    stream.source.readUtf8()
+                }
+            }
+
+            InstallSessionMode.PM_SHELL -> {
+                shell(
+                    buildShellCommand(
+                        listOf("pm", "install-create", "-S", totalLength.toString()) + installOptions
+                    )
+                ).allOutput
+            }
+        }
+        return extractSessionId(response)
+    }
+
+    private fun streamInstallWrite(apk: File, sessionId: String, sessionMode: InstallSessionMode): String {
+        return openInstallCommand(
+            sessionMode,
+            "package",
+            "install-write",
+            "-S",
+            apk.length().toString(),
+            sessionId,
+            apk.name,
+            "-"
+        ).use { stream ->
+            stream.sink.writeAll(apk.source())
+            stream.sink.flush()
+            stream.source.readUtf8()
+        }
+    }
+
+    private fun openInstallCommand(sessionMode: InstallSessionMode, vararg command: String): AdbStream = when (sessionMode) {
+        InstallSessionMode.ABB_EXEC -> abbExec(*command)
+        InstallSessionMode.EXEC_CMD -> execCmd(*command)
+        InstallSessionMode.PM_SHELL -> error("Legacy pm shell path does not open streamed install commands")
+    }
+
+    private fun pushAndWrite(apk: File, sessionId: String, index: Int): String {
+        val remotePath = "/data/local/tmp/${apk.name}"
+        val mode = readMode(apk)
+        val lastModifiedMs = apk.lastModified()
+        try {
+            push(apk, remotePath, mode = mode, lastModifiedMs = lastModifiedMs)
+            // Legacy install-write path uses shell command assembly with escape_arg() for each argv token.
+            // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/adb_install.cpp#570
+            return shell(
+                buildShellCommand(
+                    listOf(
+                        "pm",
+                        "install-write",
+                        "-S",
+                        apk.length().toString(),
+                        sessionId,
+                        index.toString(),
+                        remotePath
+                    )
+                )
+            ).allOutput
+        } finally {
+            cleanupRemoteTempFile(remotePath)
+        }
+    }
+
+    private fun cleanupRemoteTempFile(remotePath: String) {
+        // Best-effort cleanup to match AOSP install_app_legacy() delete_device_file() behavior.
+        runCatching { shell(buildDeleteDeviceFileCommand(remotePath)) }
+    }
+
+    private fun finalizeSession(sessionId: String, error: String?, sessionMode: InstallSessionMode) {
         val finalCommand = if (error == null) "install-commit" else "install-abandon"
         // AOSP finalizes sessions with install-commit/install-abandon on the same install command family.
         // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/client/adb_install.cpp#653
-        val output = if (useAbbExec) {
-            // abb_exec uses NUL-delimited command arguments in the service string.
-            // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/client/commandline.h#142
-            abbExec("package", finalCommand, sessionId, *options).use { stream ->
-                stream.source.readUtf8()
+        val output = when (sessionMode) {
+            InstallSessionMode.ABB_EXEC, InstallSessionMode.EXEC_CMD -> {
+                openInstallCommand(sessionMode, "package", finalCommand, sessionId).use { stream ->
+                    stream.source.readUtf8()
+                }
             }
-        } else {
-            shell(buildShellCommand(listOf("pm", finalCommand, sessionId) + nonBlankOptions(options))).allOutput
+            InstallSessionMode.PM_SHELL -> {
+                shell(buildShellCommand(listOf("pm", finalCommand, sessionId))).allOutput
+            }
         }
         check(output.startsWith("Success")) { "Failed to finalize session: $output" }
         error?.let { throw IOException("Install failed: $it") }
@@ -267,10 +337,22 @@ class Kadb(
         return if (escapedArgs.isEmpty()) "exec:cmd" else "exec:cmd $escapedArgs"
     }
 
+    private fun buildDeleteDeviceFileCommand(remotePath: String): String {
+        // AOSP uses "rm <file> </dev/null" here rather than "rm -f" for old-device compatibility.
+        // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/adb_install.cpp#983
+        return "rm ${escapeArg(remotePath)} </dev/null"
+    }
+
     private fun escapeArg(arg: String): String {
         // Mirror AOSP adb_utils.cpp::escape_arg(): wrap in single quotes and replace ' with '\''.
         // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/adb_utils.cpp#81
         return "'" + arg.replace("'", "'\\''") + "'"
+    }
+
+    private enum class InstallSessionMode(val usesStreaming: Boolean) {
+        ABB_EXEC(usesStreaming = true),
+        EXEC_CMD(usesStreaming = true),
+        PM_SHELL(usesStreaming = false)
     }
 
     private fun enforceLegacyShellServiceLength(service: String) {

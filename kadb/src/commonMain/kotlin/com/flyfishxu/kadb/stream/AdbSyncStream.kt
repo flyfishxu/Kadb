@@ -18,6 +18,7 @@
 package com.flyfishxu.kadb.stream
 
 import okio.Buffer
+import okio.BufferedSink
 import okio.Sink
 import okio.Source
 import java.io.IOException
@@ -202,12 +203,17 @@ class AdbSyncStream(
         while (true) {
             val read = source.read(buffer, SYNC_DATA_MAX.toLong())
             if (read == -1L) break
-            writePacket(ID_DATA, read.toInt())
-            val sent = stream.sink.writeAll(buffer)
-            check(read == sent)
+            stream.sink.apply {
+                writeFrameHeader(ID_DATA, read.toInt())
+                val sent = writeAll(this@AdbSyncStream.buffer)
+                check(read == sent)
+                flush()
+            }
         }
-        writePacket(ID_DONE, (lastModifiedMs / 1000).toInt())
-        stream.sink.flush()
+        stream.sink.apply {
+            writeFrameHeader(ID_DONE, (lastModifiedMs / 1000).toInt())
+            flush()
+        }
     }
 
     @Throws(IOException::class)
@@ -436,8 +442,7 @@ class AdbSyncStream(
 
     private fun writeRequest(id: String, path: ByteArray) {
         stream.sink.apply {
-            writeString(id, StandardCharsets.UTF_8)
-            writeIntLe(path.size)
+            writeFrameHeader(id, path.size)
             write(path)
             flush()
         }
@@ -445,10 +450,14 @@ class AdbSyncStream(
 
     private fun writePacket(id: String, arg: Int) {
         stream.sink.apply {
-            writeString(id, StandardCharsets.UTF_8)
-            writeIntLe(arg)
+            writeFrameHeader(id, arg)
             flush()
         }
+    }
+
+    private fun BufferedSink.writeFrameHeader(id: String, arg: Int) {
+        writeString(id, StandardCharsets.UTF_8)
+        writeIntLe(arg)
     }
 
     private fun readPacket(): Packet {

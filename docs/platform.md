@@ -1,35 +1,90 @@
-# Platform
+# Platform Notes
 
-Kadb requires specific libraries that depends on device platform.
+This page documents the platform-specific runtime requirements and behavior differences for Kadb.
 
-`libspake` and `conscrypt` is required if planning to use `adb pair`.
+## Support Matrix
 
-It will not affect other features, such as connecting or use legacy pairing.
+| Area | Android | JVM |
+| --- | --- | --- |
+| Direct `adbd` connection | Yes | Yes |
+| Shell / shell v2 | Yes | Yes |
+| File transfer | Yes | Yes |
+| APK install / uninstall | Yes | Yes |
+| TCP forward | Yes | Yes |
+| Wireless pairing | Yes | Yes |
+| USB discovery | No | No |
+
+## Pairing Requirements
+
+Pairing has stricter requirements than the rest of the library:
+
+- SPAKE2 support
+- TLS 1.3 support
+- TLS exporter support required by the pairing flow
+
+Basic connect / shell / sync / install usage does not require the same provider setup as pairing.
 
 ## Android
 
-### LibSpake
+### Runtime baseline
 
-In Android build of Kadb, we use pre-built `libspake.so` to handle ADB Paring on Android 9 or above.
+- `minSdk 23`
+- direct client features are supported on Android targets
+- pairing support depends on TLS provider availability
 
-### Conscrypt
+### Pairing
 
-#### SDK 28 or above
+Android pairing needs:
 
-On Android 9 or above, on-device `Conscrypt` supported TLS 1.3, no need to package your own Conscrypt.
+- SPAKE2 support
+- a TLS 1.3-capable provider
 
-`libspake` now supported 16kB page-size on Android 15 or above.
+In practice:
 
-#### SDK 23 ~ 27
+- Android 9 and newer can usually use the platform provider
+- Android 6 to 8 usually need a custom Conscrypt dependency
 
-Download: https://github.com/google/conscrypt
+If TLS 1.3 is unavailable, Kadb fails pairing rather than falling back to an older TLS version.
 
-## JVM (OpenJDK)
+## JVM
 
-### Conscrypt
+### Runtime baseline
 
-Conscrypt is required if planning to use `adb pair`. Download: https://github.com/google/conscrypt
+The JVM target supports:
 
-### LibSpake
+- direct `adbd` connection
+- shell
+- sync push / pull
+- APK install / uninstall
+- TCP forward
+- wireless pairing
 
-On JVM, Kadb uses pure Java implementation of `libspake`.
+### Pairing
+
+On JVM, pairing requires a Conscrypt runtime dependency.
+
+Recommended setup:
+
+```kotlin
+dependencies {
+    implementation("com.flyfishxu:kadb:2.1.1")
+    implementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
+}
+```
+
+Without Conscrypt on the classpath, pairing fails with an explicit runtime error.
+
+## Identity and Host Auth
+
+Kadb uses a private-key-first host identity model on every platform:
+
+- the private key is the persisted source of truth
+- certificates are generated from that key at runtime
+- optional extra private keys can be supplied for AOSP-style multi-key host auth
+
+Further detail: [kadbcert.md](kadbcert.md)
+
+## Related Docs
+
+- [Project README](../README.md)
+- [KadbCert](kadbcert.md)

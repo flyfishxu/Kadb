@@ -57,6 +57,8 @@ internal object AdbProtocol {
     // Local receive cap we advertise in CNXN (1 MiB).
     // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/adb.h
     const val CONNECT_MAXDATA = 1024 * 1024
+    const val INITIAL_DELAYED_ACK_BYTES = 32 * 1024 * 1024
+    const val FEATURE_DELAYED_ACK = "delayed_ack"
 
     // Advertise only features Kadb currently implements.
     // AOSP host banner format is "host::features=<csv>" (no NUL terminator).
@@ -69,7 +71,8 @@ internal object AdbProtocol {
         "abb_exec",
         "stat_v2",
         "ls_v2",
-        "sendrecv_v2"
+        "sendrecv_v2",
+        FEATURE_DELAYED_ACK
     )
 
     fun connectPayload(features: List<String> = CONNECT_FEATURES): ByteArray {

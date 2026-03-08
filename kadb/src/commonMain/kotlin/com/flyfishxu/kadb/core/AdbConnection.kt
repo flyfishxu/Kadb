@@ -11,6 +11,7 @@ import com.flyfishxu.kadb.transport.TransportFactory
 import com.flyfishxu.kadb.transport.asOkioSink
 import com.flyfishxu.kadb.transport.asOkioSource
 import com.flyfishxu.kadb.tls.TlsErrorMapper
+import okio.Buffer
 import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.IOException
@@ -36,17 +37,28 @@ internal class AdbConnection internal constructor(
 
     private val random = Random()
     private val messageQueue = AdbMessageQueue(adbReader)
+    private val delayedAckEnabled = supportedFeatures.contains(AdbProtocol.FEATURE_DELAYED_ACK)
 
     @Throws(IOException::class)
     fun open(destination: String): AdbStream {
         val localId = newId()
         messageQueue.startListening(localId)
         try {
-            adbWriter.writeOpen(localId, destination)
+            val initialReceiveWindow = if (delayedAckEnabled) AdbProtocol.INITIAL_DELAYED_ACK_BYTES else 0
+            adbWriter.writeOpen(localId, destination, initialReceiveWindow)
             val message = messageQueue.take(localId, AdbProtocol.CMD_OKAY)
             val remoteId = message.arg0
+            val initialAvailableSendBytes = decodeOkayAckBytes(message, delayedAckEnabled).toLong()
 
-            return AdbStream(messageQueue, adbWriter, outboundMaxPayloadSize, localId, remoteId)
+            return AdbStream(
+                messageQueue = messageQueue,
+                adbWriter = adbWriter,
+                outboundMaxPayloadSize = outboundMaxPayloadSize,
+                localId = localId,
+                remoteId = remoteId,
+                delayedAckEnabled = delayedAckEnabled,
+                initialAvailableSendBytes = initialAvailableSendBytes
+            )
         } catch (e: Throwable) {
             messageQueue.stopListening(localId)
             throw e
@@ -234,6 +246,29 @@ internal class AdbConnection internal constructor(
                 }
             }
             return ConnectionString(features)
+        }
+
+        private fun decodeOkayAckBytes(message: AdbMessage, delayedAckEnabled: Boolean): Int {
+            require(message.command == AdbProtocol.CMD_OKAY) { "Expected OKAY message, got ${message.command}" }
+            return when (message.payloadLength) {
+                0 -> {
+                    if (delayedAckEnabled) {
+                        throw IOException("Delayed ACK stream missing OKAY payload for localId: ${message.arg1.toString(16)}")
+                    }
+                    0
+                }
+
+                Int.SIZE_BYTES -> {
+                    if (!delayedAckEnabled) {
+                        throw IOException("Unexpected OKAY payload for non-delayed-ack stream: ${message.payloadLength}")
+                    }
+                    Buffer()
+                        .write(message.payload)
+                        .readIntLe()
+                }
+
+                else -> throw IOException("Invalid OKAY payload size: ${message.payloadLength}")
+            }
         }
     }
 }

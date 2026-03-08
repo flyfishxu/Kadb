@@ -57,6 +57,10 @@ internal class AdbConnection internal constructor(
         return supportedFeatures.contains(feature)
     }
 
+    // Expose the negotiated CNXN feature set to feature-gated protocol clients (e.g. sync v1/v2).
+    // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/file_sync_client.cpp#238
+    internal fun featureSnapshot(): Set<String> = supportedFeatures.toSet()
+
     private fun newId(): Int {
         var id: Int
         do {

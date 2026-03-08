@@ -90,7 +90,12 @@ class Kadb(
         openSync().use { it.recv(sink, remotePath) }
     }
 
-    fun openSync(): AdbSyncStream = AdbSyncStream(open("sync:"))
+    fun openSync(): AdbSyncStream {
+        val conn = connection()
+        // AOSP sync client behavior is feature-gated by the negotiated CNXN feature set.
+        // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/file_sync_client.cpp#238
+        return AdbSyncStream(conn.open("sync:"), conn.featureSnapshot())
+    }
 
     fun install(file: File, vararg options: String) {
         if (supportsFeature("cmd")) {

@@ -41,10 +41,48 @@ internal object AdbProtocol {
 
     const val CMD_STLS = 0x534c5453
 
-    const val CONNECT_VERSION = 0x01000000
+    // Version revision in AOSP adb.h:
+    // 0x01000000: original, 0x01000001: skip checksum.
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.h
+    const val A_VERSION_MIN = 0x01000000
+    const val A_VERSION_SKIP_CHECKSUM = 0x01000001
+    const val A_VERSION = 0x01000001
+
+    // AOSP sends A_VERSION in CNXN and clamps peer version later via min(peer, A_VERSION).
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#327
+    const val CONNECT_VERSION = A_VERSION
+    // MIN maxdata required by older protocol versions.
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/adb.h
+    const val MAX_PAYLOAD_V1 = 4 * 1024
+    // Local receive cap we advertise in CNXN (1 MiB).
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/adb.h
     const val CONNECT_MAXDATA = 1024 * 1024
 
-    val CONNECT_PAYLOAD = "host::\u0000".toByteArray()
+    // Advertise only features Kadb currently implements.
+    // AOSP host banner format is "host::features=<csv>" (no NUL terminator).
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp
+    // Feature names come from AOSP transport feature constants.
+    // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/transport.cpp#81
+    private val CONNECT_FEATURES = listOf(
+        "shell_v2",
+        "cmd",
+        "abb_exec",
+        "stat_v2",
+        "ls_v2",
+        "sendrecv_v2"
+    )
+
+    fun connectPayload(features: List<String> = CONNECT_FEATURES): ByteArray {
+        val featureList = features.distinct().joinToString(",")
+        val payload = "host::features=$featureList"
+        val bytes = payload.toByteArray(Charsets.UTF_8)
+        // AOSP limits connect/auth payload to MAX_PAYLOAD_V1 before maxdata negotiation.
+        // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#338
+        require(bytes.size <= MAX_PAYLOAD_V1) {
+            "ADB connect banner is too long: ${bytes.size} > $MAX_PAYLOAD_V1"
+        }
+        return bytes
+    }
 
     /**
      * This function performs a checksum on the ADB payload data.

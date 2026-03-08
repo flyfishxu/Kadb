@@ -1,5 +1,6 @@
 package com.flyfishxu.kadb
 import com.flyfishxu.kadb.cert.CertUtils.loadKeyPair
+import com.flyfishxu.kadb.cert.CertUtils.loadKeySet
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
 import com.flyfishxu.kadb.core.AdbConnection
 import com.flyfishxu.kadb.core.AdbProtocol
@@ -205,7 +206,7 @@ class Kadb(
 
     private fun newConnection(): Pair<AdbConnection, TransportChannel> {
         return runBlocking {
-            AdbConnection.connect(host, port, loadKeyPair(), connectTimeout, socketTimeout)
+            AdbConnection.connect(host, port, loadKeySet(), connectTimeout, socketTimeout)
         }
     }
 

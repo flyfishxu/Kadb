@@ -15,6 +15,7 @@
  */
 package com.flyfishxu.kadb.core
 
+import com.flyfishxu.kadb.DelayedAckMode
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -65,17 +66,24 @@ internal object AdbProtocol {
     // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp
     // Feature names come from AOSP transport feature constants.
     // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/transport.cpp#81
-    private val CONNECT_FEATURES = listOf(
+    private val IMPLEMENTED_CONNECT_FEATURES = listOf(
         "shell_v2",
         "cmd",
         "abb_exec",
         "stat_v2",
         "ls_v2",
-        "sendrecv_v2",
-        FEATURE_DELAYED_ACK
+        "sendrecv_v2"
     )
 
-    fun connectPayload(features: List<String> = CONNECT_FEATURES): ByteArray {
+    fun connectFeatures(delayedAckMode: DelayedAckMode = DelayedAckMode.AOSP_DEFAULT): List<String> {
+        val features = IMPLEMENTED_CONNECT_FEATURES.toMutableList()
+        if (shouldAdvertiseDelayedAck(delayedAckMode)) {
+            features += FEATURE_DELAYED_ACK
+        }
+        return features
+    }
+
+    fun connectPayload(features: List<String>): ByteArray {
         val featureList = features.distinct().joinToString(",")
         val payload = "host::features=$featureList"
         val bytes = payload.toByteArray(Charsets.UTF_8)
@@ -132,7 +140,8 @@ internal object AdbProtocol {
     private fun generateMessage(
         command: Int, arg0: Int, arg1: Int, data: ByteArray?, offset: Int, length: Int
     ): ByteArray {
-        // Protocol as defined at https://github.com/aosp-mirror/platform_system_core/blob/6072de17cd812daf238092695f26a552d3122f8c/adb/protocol.txt
+        // Protocol as defined in the ADB specification.
+        // https://android.googlesource.com/platform/system/core/+/dd7bc3319deb2b77c5d07a51b7d6cd7e11b5beb0/adb/protocol.txt
         // struct message {
         //     unsigned command;       // command identifier constant
         //     unsigned arg0;          // first argument

@@ -4,6 +4,7 @@ import com.flyfishxu.kadb.cert.AdbKeyPair
 import com.flyfishxu.kadb.cert.AndroidPubkey
 import com.flyfishxu.kadb.cert.HostKeySet
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
+import com.flyfishxu.kadb.KadbOptions
 import com.flyfishxu.kadb.pair.SslUtils
 import com.flyfishxu.kadb.queue.AdbMessageQueue
 import com.flyfishxu.kadb.stream.AdbStream
@@ -99,6 +100,7 @@ internal class AdbConnection internal constructor(
             host: String,
             port: Int,
             hostKeySet: HostKeySet,
+            options: KadbOptions = KadbOptions(),
             connectTimeoutMs: Int = 10_000,
             ioTimeoutMs: Int = 0
         ): Pair<AdbConnection, TransportChannel> {
@@ -111,7 +113,11 @@ internal class AdbConnection internal constructor(
             var writer = AdbWriter(channel.asOkioSink(ioTimeout))
 
             try {
-                writer.writeConnect()
+                val advertisedFeatures = AdbProtocol.connectFeatures(options.delayedAckMode).toSet()
+                val connectPayload = AdbProtocol.connectPayload(
+                    advertisedFeatures.toList()
+                )
+                writer.writeConnect(connectPayload)
 
                 var message: AdbMessage = try {
                     reader.readMessage()
@@ -164,6 +170,7 @@ internal class AdbConnection internal constructor(
                 // parse_banner() accepts missing features and resets feature set to empty.
                 // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#351
                 val connectionString = parseConnectionString(String(message.payload))
+                val negotiatedFeatures = connectionString.features.intersect(advertisedFeatures)
                 // Mirror atransport::update_version(): protocol_version = min(peer_version, A_VERSION).
                 // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/transport.cpp#1172
                 val version = minOf(message.arg0, AdbProtocol.A_VERSION)
@@ -194,7 +201,7 @@ internal class AdbConnection internal constructor(
                     reader,
                     writer,
                     channel,
-                    connectionString.features,
+                    negotiatedFeatures,
                     version,
                     outboundMaxPayloadSize
                 )
@@ -221,10 +228,18 @@ internal class AdbConnection internal constructor(
             host: String,
             port: Int,
             keyPair: AdbKeyPair,
+            options: KadbOptions = KadbOptions(),
             connectTimeoutMs: Int = 10_000,
             ioTimeoutMs: Int = 0
         ): Pair<AdbConnection, TransportChannel> {
-            return connect(host, port, HostKeySet.single(keyPair), connectTimeoutMs, ioTimeoutMs)
+            return connect(
+                host = host,
+                port = port,
+                hostKeySet = HostKeySet.single(keyPair),
+                options = options,
+                connectTimeoutMs = connectTimeoutMs,
+                ioTimeoutMs = ioTimeoutMs
+            )
         }
 
         private data class ConnectionString(val features: Set<String>)

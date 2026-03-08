@@ -37,8 +37,7 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
         protocolVersion = minOf(peerVersion, AdbProtocol.A_VERSION)
     }
 
-    fun writeConnect() {
-        val payload = AdbProtocol.connectPayload()
+    fun writeConnect(payload: ByteArray) {
         write(
             AdbProtocol.CMD_CNXN,
             AdbProtocol.CONNECT_VERSION,

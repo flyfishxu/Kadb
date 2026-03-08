@@ -1,4 +1,5 @@
 package com.flyfishxu.kadb
+
 import com.flyfishxu.kadb.cert.CertUtils.loadKeyPair
 import com.flyfishxu.kadb.cert.CertUtils.loadKeySet
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
@@ -29,7 +30,18 @@ class Kadb(
     private val socketTimeout: Int = 0
 ) : AutoCloseable {
 
+    private var options: KadbOptions = KadbOptions()
     private var connection: Pair<AdbConnection, TransportChannel>? = null
+
+    private constructor(
+        host: String,
+        port: Int,
+        connectTimeout: Int,
+        socketTimeout: Int,
+        options: KadbOptions
+    ) : this(host, port, connectTimeout, socketTimeout) {
+        this.options = options
+    }
 
     fun connectionCheck(): Boolean = connection?.second?.isOpen == true
 
@@ -206,7 +218,14 @@ class Kadb(
 
     private fun newConnection(): Pair<AdbConnection, TransportChannel> {
         return runBlocking {
-            AdbConnection.connect(host, port, loadKeySet(), connectTimeout, socketTimeout)
+            AdbConnection.connect(
+                host = host,
+                port = port,
+                hostKeySet = loadKeySet(),
+                options = options,
+                connectTimeoutMs = connectTimeout,
+                ioTimeoutMs = socketTimeout
+            )
         }
     }
 
@@ -465,11 +484,16 @@ class Kadb(
             host: String,
             port: Int,
             connectTimeout: Int = 0,
-            socketTimeout: Int = 0
-        ): Kadb = Kadb(host, port, connectTimeout, socketTimeout)
+            socketTimeout: Int = 0,
+            options: KadbOptions = KadbOptions()
+        ): Kadb = Kadb(host, port, connectTimeout, socketTimeout, options)
 
-        fun tryConnection(host: String, port: Int) = runCatching {
-            val kadb = create(host, port)
+        fun tryConnection(
+            host: String,
+            port: Int,
+            options: KadbOptions = KadbOptions()
+        ) = runCatching {
+            val kadb = create(host, port, options = options)
             val ok = runCatching { kadb.shell("echo success").allOutput == "success\n" }
                 .getOrElse { error ->
                     kadb.close()

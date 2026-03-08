@@ -1,5 +1,4 @@
 package com.flyfishxu.kadb
-
 import com.flyfishxu.kadb.cert.CertUtils.loadKeyPair
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
 import com.flyfishxu.kadb.core.AdbConnection
@@ -17,6 +16,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 import okio.*
 import java.io.File
+import java.io.EOFException
 import java.io.IOException
 import kotlin.Throws
 
@@ -33,8 +33,7 @@ class Kadb(
     fun connectionCheck(): Boolean = connection?.second?.isOpen == true
 
     fun open(destination: String): AdbStream {
-        val conn = connection ?: newConnection().also { connection = it }
-        return conn.first.open(destination)
+        return openStream(destination).second
     }
 
     fun supportsFeature(feature: String): Boolean = connection().supportsFeature(feature)
@@ -91,10 +90,10 @@ class Kadb(
     }
 
     fun openSync(): AdbSyncStream {
-        val conn = connection()
+        val (conn, stream) = openStream("sync:")
         // AOSP sync client behavior is feature-gated by the negotiated CNXN feature set.
         // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/file_sync_client.cpp#238
-        return AdbSyncStream(conn.open("sync:"), conn.featureSnapshot())
+        return AdbSyncStream(stream, conn.featureSnapshot())
     }
 
     fun install(file: File, vararg options: String) {
@@ -188,6 +187,15 @@ class Kadb(
         connection = null
     }
 
+    /**
+     * Reset current transport only.
+     * The Kadb instance remains reusable and reconnects lazily on next command.
+     */
+    fun resetConnection() {
+        connection?.first?.close()
+        connection = null
+    }
+
     private fun connection(): AdbConnection {
         val current = connection
         return if (current == null || !current.second.isOpen) {
@@ -196,19 +204,49 @@ class Kadb(
     }
 
     private fun newConnection(): Pair<AdbConnection, TransportChannel> {
-        var attempt = 0
-        while (true) {
-            attempt++
-            try {
-                val result = runBlocking {
-                    AdbConnection.connect(host, port, loadKeyPair(), connectTimeout, socketTimeout)
-                }
-                return result
-            } catch (e: Exception) {
-                println("CONNECT LOST; TRYING TO REBUILD SOCKET $attempt TIMES")
-                if (attempt >= 5) throw e
-                Thread.sleep(300)
+        return runBlocking {
+            AdbConnection.connect(host, port, loadKeyPair(), connectTimeout, socketTimeout)
+        }
+    }
+
+    private fun openStream(
+        destination: String,
+        retryOnStaleTransport: Boolean = true
+    ): Pair<AdbConnection, AdbStream> {
+        val conn = connection()
+        return try {
+            conn to conn.open(destination)
+        } catch (t: Throwable) {
+            if (!isRecoverableTransportOpenFailure(t)) {
+                throw t
             }
+            discardConnection(conn)
+            if (!retryOnStaleTransport) {
+                throw t
+            }
+            openStream(destination, retryOnStaleTransport = false)
+        }
+    }
+
+    private fun discardConnection(failedConnection: AdbConnection) {
+        val current = connection
+        if (current?.first === failedConnection) {
+            resetConnection()
+        } else {
+            runCatching { failedConnection.close() }
+        }
+    }
+
+    private fun isRecoverableTransportOpenFailure(error: Throwable): Boolean {
+        return when (error) {
+            is EOFException -> true
+            is IOException, is IllegalStateException -> {
+                val message = error.message.orEmpty().lowercase()
+                OPEN_TRANSPORT_FAILURE_MARKERS.any(message::contains) ||
+                    error.cause?.let(::isRecoverableTransportOpenFailure) == true
+            }
+
+            else -> error.cause?.let(::isRecoverableTransportOpenFailure) == true
         }
     }
 
@@ -397,6 +435,18 @@ class Kadb(
     }
 
     companion object {
+        private val OPEN_TRANSPORT_FAILURE_MARKERS = listOf(
+            "broken pipe",
+            "connection reset",
+            "connection aborted",
+            "socket closed",
+            "stream closed",
+            "transport closed",
+            "closed",
+            "eof",
+            "disconnected",
+            "connection closed"
+        )
         private const val SHELL_V2_FEATURE = "shell_v2"
         private const val SHELL_SERVICE_BASE = "shell"
         private const val SHELL_ARG_V2 = "v2"

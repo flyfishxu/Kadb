@@ -160,15 +160,24 @@ class AdbStream internal constructor(
         return try {
             messageQueue.take(localId, command)
         } catch (_: IOException) {
-            close()
+            close(sendClose = false)
             return null
         }
     }
 
     override fun close() {
+        close(sendClose = true)
+    }
+
+    private fun close(sendClose: Boolean) {
         if (isClosed) return
         isClosed = true
-        adbWriter.writeClose(localId, remoteId)
-        messageQueue.stopListening(localId)
+        try {
+            if (sendClose) {
+                adbWriter.writeClose(localId, remoteId)
+            }
+        } finally {
+            messageQueue.stopListening(localId)
+        }
     }
 }

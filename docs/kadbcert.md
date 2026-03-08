@@ -49,6 +49,7 @@ Kadb persists only the private key. X.509 certificates are derived on demand fro
 - classic `AUTH` will try every configured private key before sending the default user public key
 - TLS client auth will prefer the key requested by the device CA issuer list when a match exists
 - pairing still uses the default persisted user key, matching current AOSP host behavior
+- malformed optional keys are ignored; they do not block the default persisted key from being used
 
 ## Policy Defaults
 

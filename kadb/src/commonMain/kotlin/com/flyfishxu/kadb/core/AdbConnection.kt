@@ -1,6 +1,8 @@
 package com.flyfishxu.kadb.core
 
 import com.flyfishxu.kadb.cert.AdbKeyPair
+import com.flyfishxu.kadb.cert.AndroidPubkey
+import com.flyfishxu.kadb.cert.HostKeySet
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
 import com.flyfishxu.kadb.pair.SslUtils
 import com.flyfishxu.kadb.queue.AdbMessageQueue
@@ -15,16 +17,11 @@ import okio.Buffer
 import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.IOException
-import java.math.BigInteger
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.security.interfaces.RSAPublicKey
 import java.util.*
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLProtocolException
 import kotlin.Throws
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 internal class AdbConnection internal constructor(
     adbReader: AdbReader,
@@ -101,12 +98,13 @@ internal class AdbConnection internal constructor(
         suspend fun connect(
             host: String,
             port: Int,
-            keyPair: AdbKeyPair,
+            hostKeySet: HostKeySet,
             connectTimeoutMs: Int = 10_000,
             ioTimeoutMs: Int = 0
         ): Pair<AdbConnection, TransportChannel> {
             val connectTimeout = connectTimeoutMs.toLong()
             val ioTimeout = ioTimeoutMs.toLong()
+            var authKeyIndex = 0
 
             var channel: TransportChannel = TransportFactory.connect(host, port, connectTimeout)
             var reader = AdbReader(channel.asOkioSource(ioTimeout))
@@ -127,7 +125,7 @@ internal class AdbConnection internal constructor(
                             // AOSP host always sends STLS with the fixed protocol value A_STLS_VERSION.
                             // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/adb.cpp#318
                             writer.writeStls(AdbProtocol.A_STLS_VERSION)
-                            val sslContext = SslUtils.getSslContext(keyPair)
+                            val sslContext = SslUtils.getSslContext(hostKeySet)
                             val engine = SslUtils.newClientEngine(sslContext, host, port)
                             val tlsChannel = TlsNioChannel(channel, engine)
                             try {
@@ -147,13 +145,14 @@ internal class AdbConnection internal constructor(
 
                         AdbProtocol.CMD_AUTH -> {
                             check(message.arg0 == AdbProtocol.AUTH_TYPE_TOKEN) { "Unsupported auth type: $message" }
-                            val signature = keyPair.signPayload(message)
-                            writer.writeAuth(AdbProtocol.AUTH_TYPE_SIGNATURE, signature)
-                            message = reader.readMessage()
-                            if (message.command == AdbProtocol.CMD_AUTH) {
-                                writer.writeAuth(AdbProtocol.AUTH_TYPE_RSA_PUBLIC, adbPublicKey(keyPair))
-                                message = reader.readMessage()
+                            val authKey = hostKeySet.keyPairs.getOrNull(authKeyIndex)
+                            if (authKey != null) {
+                                authKeyIndex += 1
+                                writer.writeAuth(AdbProtocol.AUTH_TYPE_SIGNATURE, authKey.signPayload(message))
+                            } else {
+                                writer.writeAuth(AdbProtocol.AUTH_TYPE_RSA_PUBLIC, adbPublicKey(hostKeySet.defaultKeyPair))
                             }
+                            message = reader.readMessage()
                         }
 
                         AdbProtocol.CMD_CNXN -> break
@@ -218,6 +217,16 @@ internal class AdbConnection internal constructor(
             }
         }
 
+        suspend fun connect(
+            host: String,
+            port: Int,
+            keyPair: AdbKeyPair,
+            connectTimeoutMs: Int = 10_000,
+            ioTimeoutMs: Int = 0
+        ): Pair<AdbConnection, TransportChannel> {
+            return connect(host, port, HostKeySet.single(keyPair), connectTimeoutMs, ioTimeoutMs)
+        }
+
         private data class ConnectionString(val features: Set<String>)
 
         // ie: "device::ro.product.name=sdk_gphone_x86;ro.product.model=Android SDK built for x86;ro.product.device=generic_x86;,features=fixed_push_symlink_timestamp,apex,fixed_push_mkdir,stat_v2,abb_exec,cmd,abb,shell_v2"
@@ -275,66 +284,7 @@ internal class AdbConnection internal constructor(
 
 
 /*** ADB RSA Public Key Transformation Section ***/
-private const val KEY_LENGTH_BITS = 2048
-private const val KEY_LENGTH_BYTES = KEY_LENGTH_BITS / 8
-private const val KEY_LENGTH_WORDS = KEY_LENGTH_BYTES / 4
-
-@OptIn(ExperimentalEncodingApi::class)
 private fun adbPublicKey(keyPair: AdbKeyPair): ByteArray {
-    val pubkey = keyPair.publicKey as RSAPublicKey
-    val bytes = convertRsaPublicKeyToAdbFormat(pubkey)
-    // ADB public key payload is NUL-terminated.
-    // https://android.googlesource.com/platform/system/core/+/android-4.4_r1/adb/adb_auth_host.c
-    return Base64.encodeToByteArray(bytes) + " ${defaultDeviceName()}\u0000".encodeToByteArray()
-}
-
-// https://android.googlesource.com/platform/system/core/+/android-4.4_r1/adb/adb_auth_host.c
-@Suppress("JoinDeclarationAndAssignment")
-private fun convertRsaPublicKeyToAdbFormat(pubkey: RSAPublicKey): ByteArray {/*
-     * ADB literally just saves the RSAPublicKey struct to a file.
-     *
-     * typedef struct RSAPublicKey {
-     * int len; // Length of n[] in number of uint32_t
-     * uint32_t n0inv;  // -1 / n[0] mod 2^32
-     * uint32_t n[RSANUMWORDS]; // modulus as little endian array
-     * uint32_t rr[RSANUMWORDS]; // R^2 as little endian array
-     * int exponent; // 3 or 65537
-     * } RSAPublicKey;
-     */
-
-    /* ------ This part is a Java-ified version of RSA_to_RSAPublicKey from adb_host_auth.c ------ */
-    val r32: BigInteger
-    val r: BigInteger
-    var rr: BigInteger
-    var rem: BigInteger
-    var n: BigInteger
-    val n0inv: BigInteger
-    r32 = BigInteger.ZERO.setBit(32)
-    n = pubkey.modulus
-    r = BigInteger.ZERO.setBit(KEY_LENGTH_WORDS * 32)
-    rr = r.modPow(BigInteger.valueOf(2), n)
-    rem = n.remainder(r32)
-    n0inv = rem.modInverse(r32)
-    val myN = IntArray(KEY_LENGTH_WORDS)
-    val myRr = IntArray(KEY_LENGTH_WORDS)
-    var res: Array<BigInteger>
-    for (i in 0 until KEY_LENGTH_WORDS) {
-        res = rr.divideAndRemainder(r32)
-        rr = res[0]
-        rem = res[1]
-        myRr[i] = rem.toInt()
-        res = n.divideAndRemainder(r32)
-        n = res[0]
-        rem = res[1]
-        myN[i] = rem.toInt()
-    }
-
-    /* ------------------------------------------------------------------------------------------- */
-    val bbuf: ByteBuffer = ByteBuffer.allocate(524).order(ByteOrder.LITTLE_ENDIAN)
-    bbuf.putInt(KEY_LENGTH_WORDS)
-    bbuf.putInt(n0inv.negate().toInt())
-    for (i in myN) bbuf.putInt(i)
-    for (i in myRr) bbuf.putInt(i)
-    bbuf.putInt(pubkey.publicExponent.toInt())
-    return bbuf.array()
+    val publicKey = keyPair.publicKey as RSAPublicKey
+    return AndroidPubkey.encodeWithName(publicKey, defaultDeviceName())
 }

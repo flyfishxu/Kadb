@@ -203,11 +203,9 @@ object KadbCert {
         val keyPairs = mutableListOf(defaultKeyPair)
         val seenFingerprints = mutableSetOf(CertUtils.fingerprintSha256(defaultKeyPair.publicKey))
         for (privateKeyPem in additionalPrivateKeysPem) {
-            val extraKeyPair = try {
+            val extraKeyPair = runCatching {
                 CertUtils.identityFromPrivateKey(privateKeyPem, policy).keyPair
-            } catch (error: Throwable) {
-                throw if (error is KadbCertException) error else KadbCertException.fromPrivateKeyParseError(error)
-            }
+            }.getOrNull() ?: continue
             val fingerprint = CertUtils.fingerprintSha256(extraKeyPair.publicKey)
             if (seenFingerprints.add(fingerprint)) {
                 keyPairs += extraKeyPair

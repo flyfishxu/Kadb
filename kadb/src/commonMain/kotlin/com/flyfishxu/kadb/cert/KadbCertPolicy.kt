@@ -1,4 +1,4 @@
-﻿package com.flyfishxu.kadb.cert
+package com.flyfishxu.kadb.cert
 
 data class KadbCertPolicy(
     val keySizeBits: Int = 2048,

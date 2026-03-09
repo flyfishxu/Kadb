@@ -1,4 +1,4 @@
-﻿package com.flyfishxu.kadb.cert
+package com.flyfishxu.kadb.cert
 
 class InMemoryPrivateKeyStore : KadbPrivateKeyStore {
     private val lock = Any()

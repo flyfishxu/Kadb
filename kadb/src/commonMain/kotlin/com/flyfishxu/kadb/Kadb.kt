@@ -3,6 +3,7 @@ package com.flyfishxu.kadb
 import com.flyfishxu.kadb.cert.CertUtils.loadKeyPair
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
 import com.flyfishxu.kadb.core.AdbConnection
+import com.flyfishxu.kadb.forwarding.LocalAbstractForwarder
 import com.flyfishxu.kadb.forwarding.TcpForwarder
 import com.flyfishxu.kadb.pair.PairingConnectionCtx
 import com.flyfishxu.kadb.shell.AdbShellResponse
@@ -191,7 +192,24 @@ class Kadb(
 
     @Throws(InterruptedException::class)
     fun tcpForward(hostPort: Int, targetPort: Int): AutoCloseable {
-        val forwarder = TcpForwarder(this, hostPort, targetPort)
+        return tcpForward(hostPort, "tcp:$targetPort")
+    }
+
+    @Throws(InterruptedException::class)
+    fun tcpForward(hostPort: Int, remote: String): AutoCloseable {
+        val forwarder = TcpForwarder(this, hostPort, remote)
+        forwarder.start()
+        return forwarder
+    }
+
+    /**
+     * Forward a local abstract unix domain socket (host side) to a remote ADB destination.
+     *
+     * Example: `localabstract:my-sock` -> `tcp:7001`
+     */
+    @Throws(InterruptedException::class)
+    fun localAbstractForward(localName: String, remote: String): AutoCloseable {
+        val forwarder = LocalAbstractForwarder(this, localName, remote)
         forwarder.start()
         return forwarder
     }

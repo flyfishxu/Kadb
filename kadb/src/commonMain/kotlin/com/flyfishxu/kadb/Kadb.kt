@@ -5,6 +5,8 @@ import com.flyfishxu.kadb.cert.platform.defaultDeviceName
 import com.flyfishxu.kadb.core.AdbConnection
 import com.flyfishxu.kadb.forwarding.TcpForwarder
 import com.flyfishxu.kadb.pair.PairingConnectionCtx
+import com.flyfishxu.kadb.reverse.AdbReverse
+import com.flyfishxu.kadb.reverse.AdbReverseRule
 import com.flyfishxu.kadb.shell.AdbShellResponse
 import com.flyfishxu.kadb.shell.AdbShellStream
 import com.flyfishxu.kadb.stream.AdbStream
@@ -27,6 +29,7 @@ class Kadb(
 ) : AutoCloseable {
 
     private var connection: Pair<AdbConnection, TransportChannel>? = null
+    private val adbReverse by lazy { AdbReverse(this) }
 
     fun connectionCheck(): Boolean = connection?.second?.isOpen == true
 
@@ -194,6 +197,26 @@ class Kadb(
         val forwarder = TcpForwarder(this, hostPort, targetPort)
         forwarder.start()
         return forwarder
+    }
+
+    fun reverseForward(device: String, host: String, noRebind: Boolean = false) {
+        adbReverse.create(device, host, noRebind)
+    }
+
+    fun reverseForward(devicePort: Int, hostPort: Int, noRebind: Boolean = false) {
+        reverseForward("tcp:$devicePort", "tcp:$hostPort", noRebind)
+    }
+
+    fun reverseKillForward(device: String) {
+        adbReverse.remove(device)
+    }
+
+    fun reverseKillAllForwards() {
+        adbReverse.removeAll()
+    }
+
+    fun reverseListForwards(): List<AdbReverseRule> {
+        return adbReverse.list()
     }
 
     private fun restartAdb(destination: String): String {

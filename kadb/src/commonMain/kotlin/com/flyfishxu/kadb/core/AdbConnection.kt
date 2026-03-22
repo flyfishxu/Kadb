@@ -2,6 +2,7 @@ package com.flyfishxu.kadb.core
 
 import com.flyfishxu.kadb.cert.AdbKeyPair
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
+import com.flyfishxu.kadb.debug.log
 import com.flyfishxu.kadb.pair.SslUtils
 import com.flyfishxu.kadb.queue.AdbMessageQueue
 import com.flyfishxu.kadb.stream.AdbStream
@@ -19,11 +20,19 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.interfaces.RSAPublicKey
 import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLProtocolException
 import kotlin.Throws
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.concurrent.thread
+import okio.BufferedSink
+import okio.Source
+import okio.buffer
+import okio.sink
+import okio.source
+import java.net.Socket
 
 internal class AdbConnection internal constructor(
     adbReader: AdbReader,
@@ -36,6 +45,12 @@ internal class AdbConnection internal constructor(
 
     private val random = Random()
     private val messageQueue = AdbMessageQueue(adbReader)
+    private var reverseThread: Thread? = null
+    private val reverseSessionThreads = ConcurrentLinkedQueue<Thread>()
+
+    init {
+        startReverseBridgeLoop()
+    }
 
     @Throws(IOException::class)
     fun open(destination: String): AdbStream {
@@ -58,7 +73,11 @@ internal class AdbConnection internal constructor(
     }
 
     private fun newId(): Int {
-        return random.nextInt()
+        var id: Int
+        do {
+            id = random.nextInt()
+        } while (id == 0)
+        return id
     }
 
     @TestOnly
@@ -68,6 +87,13 @@ internal class AdbConnection internal constructor(
 
     override fun close() {
         try {
+            reverseThread?.interrupt()
+            reverseThread = null
+            while (true) {
+                val t = reverseSessionThreads.poll() ?: break
+                t.interrupt()
+            }
+            runCatching { messageQueue.stopListening(REVERSE_LISTENER_ID) }
             messageQueue.close()
             adbWriter.close()
             closeable?.close()
@@ -75,7 +101,94 @@ internal class AdbConnection internal constructor(
         }
     }
 
+    private fun startReverseBridgeLoop() {
+        messageQueue.startListening(REVERSE_LISTENER_ID)
+        reverseThread = thread(name = "kadb-reverse-accept") {
+            while (!Thread.currentThread().isInterrupted) {
+                try {
+                    val openMessage = messageQueue.take(REVERSE_LISTENER_ID, AdbProtocol.CMD_OPEN)
+                    handleIncomingOpen(openMessage)
+                } catch (_: InterruptedException) {
+                    return@thread
+                } catch (t: Throwable) {
+                    if (!Thread.currentThread().isInterrupted) {
+                        log { "reverse bridge loop error: ${t.message}" }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handleIncomingOpen(message: AdbMessage) {
+        val destination = extractOpenDestination(message) ?: run {
+            adbWriter.writeClose(0, message.arg0)
+            return
+        }
+
+        val target = parseReverseTcpTarget(destination) ?: run {
+            adbWriter.writeClose(0, message.arg0)
+            return
+        }
+
+        val localSocket = runCatching { Socket(target.host, target.port) }.getOrElse {
+            adbWriter.writeClose(0, message.arg0)
+            return
+        }
+
+        val localId = newId()
+        messageQueue.startListening(localId)
+        adbWriter.writeOkay(localId, message.arg0)
+
+        val adbStream = AdbStream(messageQueue, adbWriter, maxPayloadSize, localId, message.arg0)
+
+        val socketSource = localSocket.getInputStream().source()
+        val socketSink = localSocket.getOutputStream().sink().buffer()
+
+        val readerThread = thread(name = "kadb-reverse-local-to-device") {
+            try {
+                bridge(socketSource, adbStream.sink)
+            } finally {
+                reverseSessionThreads.remove(Thread.currentThread())
+            }
+        }
+        reverseSessionThreads.add(readerThread)
+
+        val writerThread = thread(name = "kadb-reverse-device-to-local") {
+            try {
+                bridge(adbStream.source, socketSink)
+            } finally {
+                runCatching { adbStream.close() }
+                runCatching { localSocket.close() }
+                readerThread.interrupt()
+                reverseSessionThreads.remove(Thread.currentThread())
+            }
+        }
+        reverseSessionThreads.add(writerThread)
+    }
+
+    private fun extractOpenDestination(message: AdbMessage): String? {
+        if (message.payloadLength <= 0) return null
+        val bytes = message.payload
+        val endExclusive = if (bytes[message.payloadLength - 1].toInt() == 0) {
+            message.payloadLength - 1
+        } else {
+            message.payloadLength
+        }
+        if (endExclusive <= 0) return null
+        return String(bytes, 0, endExclusive)
+    }
+
+    private fun bridge(source: Source, sink: BufferedSink) {
+        while (!Thread.currentThread().isInterrupted) {
+            val read = runCatching { source.read(sink.buffer, 256) }.getOrElse { return }
+            if (read < 0) return
+            runCatching { sink.flush() }.getOrElse { return }
+        }
+    }
+
     companion object {
+        private const val REVERSE_LISTENER_ID = 0
+
         suspend fun connect(
             host: String,
             port: Int,
@@ -179,6 +292,35 @@ internal class AdbConnection internal constructor(
             val features = keyValues.getValue("features").split(",").toSet()
             return ConnectionString(features)
         }
+    }
+}
+
+internal data class ReverseTcpTarget(
+    val host: String,
+    val port: Int,
+)
+
+internal fun parseReverseTcpTarget(destination: String): ReverseTcpTarget? {
+    if (!destination.startsWith("tcp:")) return null
+    val raw = destination.removePrefix("tcp:")
+    if (raw.isBlank()) return null
+
+    val segments = raw.split(':')
+    return when (segments.size) {
+        1 -> {
+            val port = segments[0].toIntOrNull() ?: return null
+            if (port !in 1..65535) return null
+            ReverseTcpTarget(host = "127.0.0.1", port = port)
+        }
+
+        2 -> {
+            val host = segments[0].ifBlank { return null }
+            val port = segments[1].toIntOrNull() ?: return null
+            if (port !in 1..65535) return null
+            ReverseTcpTarget(host = host, port = port)
+        }
+
+        else -> null
     }
 }
 

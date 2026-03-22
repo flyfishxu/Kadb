@@ -22,6 +22,7 @@ dokka = "2.1.0"
 hiddenapibypass = "6.1"
 conscrypt-java = "2.5.2"
 compose = "1.9.3"
+junixsocket = "2.10.1"
 
 [libraries]
 
@@ -37,3 +38,4 @@ okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }
 conscrypt-java = { module = "org.conscrypt:conscrypt-openjdk-uber", version.ref = "conscrypt-java" }
+junixsocket-core = { module = "com.kohlschutter.junixsocket:junixsocket-core", version.ref = "junixsocket" }

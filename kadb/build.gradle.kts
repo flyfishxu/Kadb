@@ -34,6 +34,7 @@ kotlin {
         jvmMain.dependencies {
             implementation(libs.spake2)
             implementation(libs.jmdns)
+            implementation(libs.junixsocket.core)
         }
 
         commonTest.dependencies {

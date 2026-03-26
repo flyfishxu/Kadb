@@ -16,14 +16,14 @@ import java.util.*
 import javax.security.auth.Destroyable
 
 // The following values are taken from the following source and are subjected to change
-// https://android.googlesource.com/platform//packages/modules/adb/+/main/pairing_auth/pairing_auth.cpp
+// https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/pairing_auth/pairing_auth.cpp
 private val CLIENT_NAME: ByteArray
     get() = getBytes("adb pair client\u0000", "UTF-8")
 private val SERVER_NAME: ByteArray
     get() = getBytes("adb pair server\u0000", "UTF-8")
 
 // The following values are taken from the following source and are subjected to change
-// https://android.googlesource.com/platform//packages/modules/adb/+/main/pairing_auth/aes_128_gcm.cpp
+// https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/pairing_auth/aes_128_gcm.cpp
 internal val INFO: ByteArray
     get() = getBytes("adb pairing_auth aes-128-gcm key", "UTF-8")
 
@@ -44,7 +44,9 @@ internal actual class PairingAuthCtx(
 
     actual fun initCipher(theirMsg: ByteArray?): Boolean {
         if (mIsDestroyed) return false
-        val keyMaterial = mSpake2Ctx.processMessage(theirMsg)
+        // AOSP returns false when peer SPAKE2 processing fails.
+        // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/pairing_auth/pairing_auth.cpp#154
+        val keyMaterial = mSpake2Ctx.processMessage(theirMsg) ?: return false
         val hkdf = HKDFBytesGenerator(SHA256Digest())
         hkdf.init(HKDFParameters(keyMaterial, null, INFO))
         hkdf.generateBytes(mSecretKey, 0, mSecretKey.size)

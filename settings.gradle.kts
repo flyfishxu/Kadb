@@ -22,4 +22,3 @@ plugins {
 
 rootProject.name = "Kadb"
 include(":kadb")
-include(":kadb-test-app")

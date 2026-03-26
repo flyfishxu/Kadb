@@ -15,6 +15,7 @@
  */
 package com.flyfishxu.kadb.core
 
+import com.flyfishxu.kadb.DelayedAckMode
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -41,10 +42,58 @@ internal object AdbProtocol {
 
     const val CMD_STLS = 0x534c5453
 
-    const val CONNECT_VERSION = 0x01000000
-    const val CONNECT_MAXDATA = 1024 * 1024
+    // Version revision in AOSP adb.h:
+    // 0x01000000: original, 0x01000001: skip checksum.
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.h
+    const val A_VERSION_MIN = 0x01000000
+    const val A_VERSION_SKIP_CHECKSUM = 0x01000001
+    const val A_VERSION = 0x01000001
 
-    val CONNECT_PAYLOAD = "host::\u0000".toByteArray()
+    // AOSP sends A_VERSION in CNXN and clamps peer version later via min(peer, A_VERSION).
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#327
+    const val CONNECT_VERSION = A_VERSION
+    // MIN maxdata required by older protocol versions.
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/adb.h
+    const val MAX_PAYLOAD_V1 = 4 * 1024
+    // Local receive cap we advertise in CNXN (1 MiB).
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/adb.h
+    const val CONNECT_MAXDATA = 1024 * 1024
+    const val INITIAL_DELAYED_ACK_BYTES = 32 * 1024 * 1024
+    const val FEATURE_DELAYED_ACK = "delayed_ack"
+
+    // Advertise only features Kadb currently implements.
+    // AOSP host banner format is "host::features=<csv>" (no NUL terminator).
+    // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp
+    // Feature names come from AOSP transport feature constants.
+    // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/transport.cpp#81
+    private val IMPLEMENTED_CONNECT_FEATURES = listOf(
+        "shell_v2",
+        "cmd",
+        "abb_exec",
+        "stat_v2",
+        "ls_v2",
+        "sendrecv_v2"
+    )
+
+    fun connectFeatures(delayedAckMode: DelayedAckMode = DelayedAckMode.AOSP_DEFAULT): List<String> {
+        val features = IMPLEMENTED_CONNECT_FEATURES.toMutableList()
+        if (shouldAdvertiseDelayedAck(delayedAckMode)) {
+            features += FEATURE_DELAYED_ACK
+        }
+        return features
+    }
+
+    fun connectPayload(features: List<String>): ByteArray {
+        val featureList = features.distinct().joinToString(",")
+        val payload = "host::features=$featureList"
+        val bytes = payload.toByteArray(Charsets.UTF_8)
+        // AOSP limits connect/auth payload to MAX_PAYLOAD_V1 before maxdata negotiation.
+        // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#338
+        require(bytes.size <= MAX_PAYLOAD_V1) {
+            "ADB connect banner is too long: ${bytes.size} > $MAX_PAYLOAD_V1"
+        }
+        return bytes
+    }
 
     /**
      * This function performs a checksum on the ADB payload data.
@@ -91,7 +140,8 @@ internal object AdbProtocol {
     private fun generateMessage(
         command: Int, arg0: Int, arg1: Int, data: ByteArray?, offset: Int, length: Int
     ): ByteArray {
-        // Protocol as defined at https://github.com/aosp-mirror/platform_system_core/blob/6072de17cd812daf238092695f26a552d3122f8c/adb/protocol.txt
+        // Protocol as defined in the ADB specification.
+        // https://android.googlesource.com/platform/system/core/+/dd7bc3319deb2b77c5d07a51b7d6cd7e11b5beb0/adb/protocol.txt
         // struct message {
         //     unsigned command;       // command identifier constant
         //     unsigned arg0;          // first argument

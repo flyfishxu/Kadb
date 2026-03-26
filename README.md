@@ -1,154 +1,121 @@
 # Kadb
 
-A Kotlin Multiplatform library to connect Android devices without ADB server.
+[![Maven Central](https://img.shields.io/maven-central/v/com.flyfishxu/kadb.svg)](https://central.sonatype.com/artifact/com.flyfishxu/kadb)
 
-Kadb offers a wide range of features, including wireless debugging, apk sideloading, file management, port forwarding,
-and shell command execution. Wireless debugging without relying on `adb` binary.
+Kadb is a Kotlin Multiplatform ADB client library for talking directly to `adbd`.
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.flyfishxu/kadb.svg)](https://mvnrepository.com/artifact/com.flyfishxu/kadb) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/flyfishxu/Kadb)
+It is intended for apps and tools that need shell, sync, install, pairing, or port forwarding without embedding the full `adb` CLI or server stack.
 
-## Getting Started
+[Platform Notes](docs/platform.md) · [Host Identity](docs/kadbcert.md) · [Docs Index](docs/README.md)
 
-Kadb now available on Maven Central:
+## Overview
+
+- Direct Kotlin API for `adbd`
+- Android and JVM targets
+- Wireless pairing, shell, file transfer, install, and TCP forwarding
+- AOSP-aligned host behavior where practical
+
+Kadb is not a full adb server replacement. USB discovery, transport brokering, and server-style device tracking are out of scope.
+
+## Installation
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:<version>")
+    implementation("com.flyfishxu:kadb:2.1.1")
 }
 ```
 
-## Features
+## Quick Start
 
-- Wireless Debugging Support: Say goodbye to cables and the traditional ADB binaries! Kadb enables wireless debugging
-  for a hassle-free connection to your Android devices, including Wear OS, Android TV, Android Auto, and even debugging
-  directly on the Android device itself.
-
-- Seamless Device Connection: Whether you're working with an emulator or a physical device, Kadb's intuitive APIs make
-  connections effortless.
-
-- Secure ADB Connections: With SSL/TLS1.3 support, Kadb ensures your connections are secure, supporting both legacy ADB
-  Over WLAN, and new ADB pairing authentication methods.
-
-- Efficient File Management: Push and pull files with ease with Android DocumentFile and Okio, ensuring fast and
-  reliable file transfers.
-
-- Enhanced Error Handling: Encounter fewer roadblocks with Kadb's informative exceptions, improving your debugging
-  experience.
-
-- Broad Compatibility: Kadb supports Android API level 21 and above, ensuring wide device compatibility. Note: Conscrypt
-  library may required on Android Q or earlier devices.
-
-- Kotlin Multiplatform Ready: Kadb is designed to work seamlessly with Compose Desktop projects, allowing you to target
-  any JVM based platform with ease.
-
-- Device Discovery and Customization: Easily discover devices and customize Kadb to fit your needs, from generating
-  custom certificates to setting ADB client name as you like.
-
-## Usages
-
-### Connect to a device
-
-Connect to `emulator-5554` and install `apkFile`:
+Connect to an existing device transport:
 
 ```kotlin
-Kadb.create("localhost", 5555).use { kadb ->
-    kadb.install(apkFile)
+Kadb.create("127.0.0.1", 5555).use { kadb ->
+    val response = kadb.shell("echo hello")
+    check(response.exitCode == 0)
+    check(response.output == "hello\n")
 }
 ```
 
-*Note: Connect to the odd adb daemon port (5555), not the even emulator console port (5554)*
-
-### Pair with new device
-
-<Host: 10.0.0.175; Port: 37755; PairCode: 643102>
+Pair with a new Android 11+ device:
 
 ```kotlin
 Kadb.pair("10.0.0.175", 37755, "643102")
 ```
 
-*Note: Pair only works when target device running Android 11 and above*
+## API Overview
 
-*Known Issue: Device pairing is currently not available on JVM target, we are working to resolve this issue*
+| Capability | API |
+| --- | --- |
+| Connect to `adbd` | `Kadb.create(...)` |
+| Wireless pairing | `Kadb.pair(...)` |
+| Shell | `shell(...)`, `openShell()`, `openPtyShellSession()` |
+| File transfer | `push(...)`, `pull(...)`, `openSync()` |
+| APK install | `install(...)`, `installMultiple(...)`, `uninstall(...)` |
+| Port forwarding | `tcpForward(...)` |
+| Transport reuse | `resetConnection()` |
 
-### Discover a Device
+## Examples
 
-The following discovers and returns a connected device or emulator.
-If there are multiple it returns the first one
-found.
-
-```kotlin
-val kadb = Kadb.discover()
-if (kadb == null) throw RuntimeException("No adb device found")
-```
-
-Use the following API if you want to list all available devices:
-
-```kotlin
-val kadbs = Kadb.list()
-```
-
-### Connecting to a physical device
-
-*Prerequisite: Connecting to a physical device requires a running adb server. In most cases, this means that you must
-have the `adb` binary installed on your machine.*
-
-The `Kadb.discover()` and `Kadb.list()` methods now both support USB-connected devices.
+Install an APK:
 
 ```kotlin
-// Both of these will include any USB-connected devices if they are available
-val kadb = Kadb.discover()
-val kadbs = Kadb.list()
-```
-
-If you'd like to connect directly to a physical device via its serial number. Use the following API:
-
-```kotlin
-val kadb = AdbServer.createKadb(
-    adbServerHost = "localhost",
-    adbServerPort = 5037,
-    deviceQuery = "host:transport:${serialNumber}"
-)
-```
-
-### Install / Uninstall APK
-
-```kotlin
-kadb.install(exampleApkFile)
-kadb.uninstall("com.example.app")
-```
-
-### Push / Pull Files
-
-```kotlin
-kadb.push(srcFile, "/data/local/tmp/dst.txt")
-kadb.pull(dstFile, "/data/local/tmp/src.txt")
-```
-
-### Execute Shell Command
-
-```kotlin
-val response = kadb.shell("echo hello")
-assert(response.exitCode == 0)
-assert(response.output == "hello\n")
-```
-
-### TCP Forwarding
-
-```kotlin
-kadb.tcpForward(
-    hostPort = 7001,
-    targetPort = 7001
-).use {
-    // localhost:7001 is now forwarded to device's 7001 port
-    // Do operations that depend on port forwarding
+Kadb.create("127.0.0.1", 5555).use { kadb ->
+    kadb.install(apkFile)
 }
 ```
 
+Push a file:
+
+```kotlin
+Kadb.create("127.0.0.1", 5555).use { kadb ->
+    kadb.push(localFile, "/data/local/tmp/remote.txt")
+}
+```
+
+Forward a TCP port:
+
+```kotlin
+Kadb.create("127.0.0.1", 5555).tcpForward(
+    hostPort = 7001,
+    targetPort = 7001
+).use {
+    // localhost:7001 now forwards to the device's port 7001
+}
+```
+
+## Platform and Pairing Notes
+
+- Android target support starts at `minSdk 23`
+- Basic connect / shell / sync / install flows do not require the full `adb` binary
+- Pairing has stricter requirements than ordinary client operations
+- JVM pairing requires `conscrypt-openjdk-uber`
+- Android 6 to 8 usually need a custom Conscrypt dependency for pairing
+
+Example JVM pairing dependency:
+
+```kotlin
+dependencies {
+    implementation("com.flyfishxu:kadb:2.1.1")
+    implementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
+}
+```
+
+More detail: [docs/platform.md](docs/platform.md)
+
+## Scope and Limitations
+
+- Kadb is a direct client library, not a full adb server
+- USB transport discovery still requires external tooling
+
+## Documentation
+
+- [Documentation Index](docs/README.md)
+- [Platform Notes](docs/platform.md)
+- [KadbCert](docs/kadbcert.md)
+
 ## Acknowledgements
 
-Kadb is based on following projects:
-
-- [Dadb](https://github.com/mobile-dev-inc/dadb): Kadb is based and inspired by Dadb.
-  We are grateful for the work done by mobile-dev-inc team.
-- [libadb-android](https://github.com/MuntashirAkon/libadb-android): Kadb is inspired by libadb-android and spake2-java
-  for SSL connection and ADB Pairing.
+- [Dadb](https://github.com/mobile-dev-inc/dadb)
+- [libadb-android](https://github.com/MuntashirAkon/libadb-android)
+- [spake2-java](https://github.com/Flyfish233/spake2-java)

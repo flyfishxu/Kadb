@@ -14,7 +14,9 @@ class AdbShellStream(
         while (true) {
             when (val packet = read()) {
                 is AdbShellPacket.Exit -> {
-                    val exitCode = packet.payload[0].toInt()
+                    // Shell v2 exit code is stored as a single byte.
+                    // https://android.googlesource.com/platform/system/core/+/c0e6e40/adb/shell_service.cpp
+                    val exitCode = packet.payload[0].toUByte().toInt()
                     return AdbShellResponse(output.toString(), errorOutput.toString(), exitCode)
                 }
 
@@ -24,10 +26,6 @@ class AdbShellStream(
 
                 is AdbShellPacket.StdError -> {
                     errorOutput.append(String(packet.payload))
-                }
-
-                else -> {
-                    throw IllegalStateException("Unexpected shell packet: $packet")
                 }
             }
         }
@@ -43,9 +41,6 @@ class AdbShellStream(
                 AdbShellPacketV2.ID_STDOUT -> AdbShellPacket.StdOut(payload)
                 AdbShellPacketV2.ID_STDERR -> AdbShellPacket.StdError(payload)
                 AdbShellPacketV2.ID_EXIT -> AdbShellPacket.Exit(payload)
-                AdbShellPacketV2.ID_CLOSE_STDIN -> throw IOException("Todo: ID_CLOSE_STDIN")
-                AdbShellPacketV2.ID_WINDOW_SIZE_CHANGE -> throw IOException("Todo: ID_WINDOW_SIZE_CHANGE")
-                AdbShellPacketV2.ID_INVALID -> throw IOException("Todo: ID_INVALID")
                 else -> throw IllegalArgumentException("Invalid shell packet id: $id")
             }
         }
@@ -53,7 +48,29 @@ class AdbShellStream(
 
     @Throws(IOException::class)
     fun write(string: String) {
-        write(AdbShellPacketV2.ID_STDIN, string.toByteArray())
+        write(string.toByteArray())
+    }
+
+    @Throws(IOException::class)
+    fun write(input: ByteArray) {
+        // Shell v2 stdin data packet id.
+        // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/shell_protocol.h#46
+        write(AdbShellPacketV2.ID_STDIN, input)
+    }
+
+    @Throws(IOException::class)
+    fun closeStdin() {
+        // Shell v2 close-stdin control packet id.
+        // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/shell_protocol.h#51
+        write(AdbShellPacketV2.ID_CLOSE_STDIN)
+    }
+
+    @Throws(IOException::class)
+    fun resize(rows: Int, cols: Int, xPixels: Int = 0, yPixels: Int = 0) {
+        // AOSP shell daemon parses size payload as "<rows>x<cols>,<xpixels>x<ypixels>".
+        // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/daemon/shell_service.cpp#687
+        val payload = "${rows}x${cols},${xPixels}x${yPixels}".encodeToByteArray()
+        write(AdbShellPacketV2.ID_WINDOW_SIZE_CHANGE, payload)
     }
 
     @Throws(IOException::class)
@@ -71,6 +88,8 @@ class AdbShellStream(
     }
 
     private fun checkId(id: Int): Int {
+        // In shell v2, device-to-host data frames use stdout/stderr/exit ids.
+        // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/shell_protocol.h
         check(id == AdbShellPacketV2.ID_STDOUT || id == AdbShellPacketV2.ID_STDERR || id == AdbShellPacketV2.ID_EXIT) {
             "Invalid shell packet id: $id"
         }

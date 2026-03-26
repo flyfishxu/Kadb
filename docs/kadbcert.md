@@ -1,62 +1,78 @@
 # KadbCert
 
-Object `com.flyfishxu.kadb.cert.KadbCert`
+Object: `com.flyfishxu.kadb.cert.KadbCert`
 
-Manage Certificates for `Kadb`.
+`KadbCert` uses a private-key-first identity model:
 
-You do not need to use this object if you are using one-time authorization, which does not require the storage of a
-keystore elsewhere. In such cases, Kadb will generate a new keystore for each connection. However, if you wish to store
-the keystore for future use, you can use this object to manage it.
+- Private key is the persisted source of truth.
+- Certificate is always generated from the private key at runtime.
+- Importing a certificate only affects the current in-memory identity; persistence stores the private key only.
 
-## Methods
+## Configure
 
-Use the following methods to import keystore:
+```kotlin
+val store = OkioFilePrivateKeyStore(
+    privateKeyPath = "/path/to/private_key.pem".toPath()
+)
 
-```
- KadbCert.set(cert: ByteArray, key: ByteArray)
-```
-
-An exception will be thrown if the certificate is invalid.
-
-To generate a new keystore and import it into Kadb, use the following method:
-
-```
-  KadbCert.get(
-    keySize: Int = 2048,
-    cn: String = "Kadb",
-    ou: String = "Kadb",
-    o: String = "Kadb",
-    l: String = "Kadb",
-    st: String = "Kadb",
-    c: String = "Kadb",
-    notAfter: Long = System.currentTimeMillis()+10368000000, // 120 days
-    serialNumber: BigInteger = BigInteger(64, SecureRandom())
-    ): Pair<ByteArray, ByteArray>
+KadbCert.configure(
+    store = store,
+    policy = KadbCertPolicy(),
+    additionalPrivateKeysPem = emptyList()
+)
 ```
 
-This method will return a pair consisting of a certificate and a key. You can convert the keystore to a string using
-`kotlin.text.ByteArray.decodeToString()` and save it to a database or `SharedPreferences`. It will appear as follows:
+## APIs
 
-```
------BEGIN CERTIFICATE-----
-[B64 encoded certificate]    
------END CERTIFICATE-----
-```
-
-```
------BEGIN PRIVATE KEY-----
-[B64 encoded private key]
------END PRIVATE KEY-----
+```kotlin
+KadbCert.ensureReady(): KadbIdentitySnapshot
+KadbCert.rotate(): KadbIdentitySnapshot
+KadbCert.importIdentity(privateKeyPem: ByteArray, certificatePem: ByteArray? = null): KadbIdentitySnapshot
+KadbCert.importPrivateKey(privateKeyPem: ByteArray): KadbIdentitySnapshot
+KadbCert.exportIdentityOrNull(): KadbIdentitySnapshot?
+KadbCert.exportPrivateKeyOrNull(): ByteArray?
+KadbCert.clear()
 ```
 
-You can also store the ByteArrays directly in a file.
+## Store Contract
 
-To retrieve the keystore currently in use, use the following method:
+`KadbPrivateKeyStore` is intentionally minimal:
 
-```
-  KadbCert.getOrError(): Pair<ByteArray, ByteArray>
-```
+- `readPrivateKeyPem()`
+- `writePrivateKeyPemAtomic(...)`
+- `clear()`
 
-If you have been using Kadb directly without managing the keystore through `KadbCert`, keep in mind that Kadb
-automatically generates a new keystore in memory each time. While using Kadb, you can export this auto-generated
-keystore for safekeeping.
+Kadb persists only the private key. X.509 certificates are derived on demand from that key.
+
+`additionalPrivateKeysPem` is an in-memory-only host key ring. It lets Kadb mirror AOSP host behavior more closely:
+
+- classic `AUTH` will try every configured private key before sending the default user public key
+- TLS client auth will prefer the key requested by the device CA issuer list when a match exists
+- pairing still uses the default persisted user key, matching current AOSP host behavior
+- malformed optional keys are ignored; they do not block the default persisted key from being used
+
+## Policy Defaults
+
+`KadbCertPolicy` defaults:
+
+- `keySizeBits = 2048`
+- `certValidityDays = 3650`
+- `autoHealInvalidPrivateKey = true`
+- Subject defaults aligned with AOSP profile: `C=US, O=Android, CN=Adb`
+
+## Certificate Profile
+
+Generated certificate profile:
+
+- Serial number: `1`
+- Validity: `now` to `now + 10 years`
+- Signature: `SHA256withRSA`
+- Extensions: `BasicConstraints`, `KeyUsage`, `SubjectKeyIdentifier`
+
+## Notes
+
+- `Kadb.create()` / `Kadb.pair()` APIs are unchanged.
+- `SslUtils` cache is keyed by certificate fingerprint, so certificate rotation/invalidation rebuilds `SSLContext`.
+- `KadbIdentitySnapshot` is a runtime materialization. With the same persisted private key, `certificatePem`,
+  `fingerprintSha256`, and `notAfterEpochMillis` can change if the certificate generation policy changes.
+- `additionalPrivateKeysPem` does not change `KadbIdentitySnapshot`; the snapshot always describes the default persisted key.

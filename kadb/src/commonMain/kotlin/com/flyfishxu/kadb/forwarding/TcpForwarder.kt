@@ -73,23 +73,25 @@ internal class TcpForwarder(
             val client = serverRef.accept()
 
             clientExecutor?.execute {
-                val adbStream = kadb.open("tcp:$targetPort")
-
-                val readerThread = thread {
-                    forward(
-                        client.getInputStream().source(), adbStream.sink
-                    )
-                }
-
+                var adbStream: com.flyfishxu.kadb.stream.AdbStream? = null
+                var readerThread: Thread? = null
                 try {
+                    adbStream = kadb.open("tcp:$targetPort")
+                    val stream = adbStream
+                    readerThread = thread {
+                        try {
+                            forward(client.getInputStream().source(), stream.sink)
+                        } finally {
+                            stream.close()
+                        }
+                    }
                     forward(
-                        adbStream.source, client.sink().buffer()
+                        stream.source, client.sink().buffer()
                     )
                 } finally {
-                    adbStream.close()
+                    adbStream?.close()
                     client.close()
-
-                    readerThread.interrupt()
+                    readerThread?.interrupt()
                 }
             }
         }
@@ -131,7 +133,7 @@ internal class TcpForwarder(
                         return
                     }
                 } catch (_: IOException) {
-                    // Do nothing
+                    return
                 }
             }
         } catch (_: InterruptedException) {

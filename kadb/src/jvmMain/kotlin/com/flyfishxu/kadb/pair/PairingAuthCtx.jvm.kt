@@ -16,14 +16,14 @@ import java.util.*
 import javax.security.auth.Destroyable
 
 // The following values are taken from the following source and are subjected to change
-// https://android.googlesource.com/platform//packages/modules/adb/+/main/pairing_auth/pairing_auth.cpp
+// https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/pairing_auth/pairing_auth.cpp
 private val CLIENT_NAME: ByteArray
     get() = getBytes("adb pair client\u0000", "UTF-8")
 private val SERVER_NAME: ByteArray
     get() = getBytes("adb pair server\u0000", "UTF-8")
 
 // The following values are taken from the following source and are subjected to change
-// https://android.googlesource.com/platform//packages/modules/adb/+/main/pairing_auth/aes_128_gcm.cpp
+// https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/master/pairing_auth/aes_128_gcm.cpp
 internal val INFO: ByteArray
     get() = getBytes("adb pairing_auth aes-128-gcm key", "UTF-8")
 

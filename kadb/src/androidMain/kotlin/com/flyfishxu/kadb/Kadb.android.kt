@@ -15,9 +15,11 @@ fun Kadb.pull(
 ) {
     val outputStream = context.contentResolver.openOutputStream(dst.uri)
     checkNotNull(outputStream)
-    val sink = outputStream.sink()
-    pull(sink, remotePath)
-    outputStream.close()
+    outputStream.use { stream ->
+        stream.sink().use { sink ->
+            pull(sink, remotePath)
+        }
+    }
 }
 
 fun Kadb.push(
@@ -29,9 +31,11 @@ fun Kadb.push(
 ) {
     val inputStream = context.contentResolver.openInputStream(src.uri)
     checkNotNull(inputStream)
-    val source = inputStream.source()
-    push(source, remotePath, mode, lastModifiedMs)
-    inputStream.close()
+    inputStream.use { stream ->
+        stream.source().use { source ->
+            push(source, remotePath, mode, lastModifiedMs)
+        }
+    }
 }
 
 fun Kadb.install(
@@ -40,14 +44,24 @@ fun Kadb.install(
 ) {
     val inputStream = context.contentResolver.openInputStream(src.uri)
     checkNotNull(inputStream)
-    val source = inputStream.source()
-    install(source, src.length())
+    inputStream.use { stream ->
+        stream.source().use { source ->
+            install(source, src.length())
+        }
+    }
 }
 
 fun Kadb.readMode(file: DocumentFile): Int {
-    return if (file.canRead()) 400
-    else if (file.canWrite()) 200
-    else 0
+    // SYNC SEND uses Unix mode bits (e.g. 0o400) encoded as decimal.
+    // https://android.googlesource.com/platform/system/core/+/refs/tags/android-11.0.0_r20/adb/SYNC.TXT
+    var mode = 0
+    if (file.canRead()) {
+        mode = mode or 256
+    }
+    if (file.canWrite()) {
+        mode = mode or 128
+    }
+    return mode
 }
 
 actual fun Kadb.readMode(file: File): Int {
@@ -58,13 +72,13 @@ actual fun Kadb.readMode(file: File): Int {
     } else {
         var mode = 0
         if (file.canRead()) {
-            mode = mode or 400
+            mode = mode or 256
         }
         if (file.canWrite()) {
-            mode = mode or 200
+            mode = mode or 128
         }
         if (file.canExecute()) {
-            mode = mode or 100
+            mode = mode or 64
         }
         mode
     }

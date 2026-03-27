@@ -2,7 +2,7 @@
 
 [plugins]
 
-androidLibrary = { id = "com.android.library", version.ref = "agp" }
+androidMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
@@ -10,10 +10,9 @@ dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 agp = "9.1.0"
 bc = "1.83"
 spake2 = "1.0.5"
-kotlin = "2.3.10"
+kotlin = "2.3.20"
 kotlinxCoroutinesCore = "1.10.2"
-nexus-publish = "2.0.0"
-okio = "3.16.4"
+okio = "3.17.0"
 documentfile = "1.1.0"
 dokka = "2.1.0"
 hiddenapibypass = "6.1"
@@ -26,7 +25,6 @@ bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bc" }
 spake2 = { module = "com.github.Flyfish233:spake2-java", version.ref = "spake2" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
-nexus-publish = { module = "io.github.gradle-nexus.publish-plugin:io.github.gradle-nexus.publish-plugin.gradle.plugin", version.ref = "nexus-publish" }
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }

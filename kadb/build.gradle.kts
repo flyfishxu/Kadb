@@ -1,7 +1,8 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.androidMultiplatformLibrary)
     id("com.vanniktech.maven.publish")
+    id("signing")
 }
 
 kotlin {
@@ -11,11 +12,12 @@ kotlin {
         }
     }
 
-    androidTarget {
-        kotlin {
-            jvmToolchain(21)
-        }
-        publishLibraryVariants("release", "debug")
+    android {
+        namespace = "com.flyfishxu.kadb"
+        compileSdk = 36
+        minSdk = 23
+
+        withJava()
     }
 
     sourceSets {
@@ -51,12 +53,8 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().con
     }
 }
 
-android {
-    namespace = "com.flyfishxu.kadb"
-    compileSdk = 36
-    defaultConfig {
-        minSdk = 23
-    }
+signing {
+    useGpgCmd()
 }
 
 mavenPublishing {

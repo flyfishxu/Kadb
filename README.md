@@ -37,6 +37,22 @@ Kadb.create("127.0.0.1", 5555).use { kadb ->
 }
 ```
 
+Automatically discover local ADB daemons (Android only):
+
+```kotlin
+val discovery = KadbMdns(context, KadbMdns.ServiceType.ADB, object : KadbMdns.OnServiceDiscoveredListener {
+    override fun onServiceChanged(host: InetAddress?, port: Int) {
+        if (port != -1) {
+            // Found local ADB daemon at host:port
+            Kadb.create(host!!.hostAddress, port).use { kadb ->
+                // Use kadb
+            }
+        }
+    }
+})
+discovery.start()
+```
+
 Pair with a new Android 11+ device:
 
 ```kotlin
@@ -48,6 +64,7 @@ Kadb.pair("10.0.0.175", 37755, "643102")
 | Capability | API |
 | --- | --- |
 | Connect to `adbd` | `Kadb.create(...)` |
+| mDNS Discovery | `KadbMdns(...)` |
 | Wireless pairing | `Kadb.pair(...)` |
 | Shell | `shell(...)`, `openShell()`, `openPtyShellSession()` |
 | File transfer | `push(...)`, `pull(...)`, `openSync()` |
@@ -82,6 +99,21 @@ Kadb.create("127.0.0.1", 5555).tcpForward(
 ).use {
     // localhost:7001 now forwards to the device's port 7001
 }
+```
+
+Discover local services with mDNS:
+
+```kotlin
+val discovery = KadbMdns(context, KadbMdns.ServiceType.ADB, object : KadbMdns.OnServiceDiscoveredListener {
+    override fun onServiceChanged(host: InetAddress?, port: Int) {
+        if (port != -1) {
+            // Service found/updated
+        } else {
+            // Service lost
+        }
+    }
+})
+discovery.start()
 ```
 
 ## Platform and Pairing Notes

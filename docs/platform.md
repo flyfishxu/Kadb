@@ -7,6 +7,7 @@ This page documents the platform-specific runtime requirements and behavior diff
 | Area | Android | JVM |
 | --- | --- | --- |
 | Direct `adbd` connection | Yes | Yes |
+| mDNS Discovery | Yes | No |
 | Shell / shell v2 | Yes | Yes |
 | File transfer | Yes | Yes |
 | APK install / uninstall | Yes | Yes |
@@ -45,6 +46,13 @@ In practice:
 - Android 6 to 8 usually need a custom Conscrypt dependency
 
 If TLS 1.3 is unavailable, Kadb fails pairing rather than falling back to an older TLS version.
+
+### mDNS Discovery
+
+Kadb supports automatic discovery of ADB daemons on Android using `NsdManager`. This is useful for identifying local wireless debugging targets or pairing services.
+
+- requires `NSD_SERVICE` (platform default)
+- no special permissions beyond standard internet access are typically required for discovery on modern Android, though some OEM versions may vary.
 
 ## JVM
 

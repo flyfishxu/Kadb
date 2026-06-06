@@ -1,6 +1,8 @@
 package com.flyfishxu.kadb.cert
 
 import okio.Buffer
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.asn1.pkcs.RSAPrivateKey as BcRsaPrivateKey
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
@@ -256,10 +258,30 @@ internal object CertUtils {
         throw CertificateException("All certificate providers failed to generate a certificate.")
     }
 
-    private fun derivePublicKey(privateKey: PrivateKey): PublicKey {
+    internal fun derivePublicKey(privateKey: PrivateKey): PublicKey {
         val rsaPrivate = privateKey as? RSAPrivateCrtKey
-            ?: throw KadbCertException.PolicyViolation("Only RSA private keys with CRT parameters are supported")
-        val spec = RSAPublicKeySpec(rsaPrivate.modulus, rsaPrivate.publicExponent)
+        if (rsaPrivate != null) {
+            return generateRsaPublicKey(rsaPrivate.modulus, rsaPrivate.publicExponent)
+        }
+
+        val encoded = privateKey.encoded
+            ?: throw KadbCertException.PolicyViolation("RSA private key encoding is unavailable")
+        val privateKeyInfo = runCatching {
+            PrivateKeyInfo.getInstance(encoded)
+        }.getOrElse { error ->
+            throw KadbCertException.PolicyViolation("Failed to parse RSA private key encoding", error)
+        }
+        val encodedRsaPrivate = runCatching {
+            BcRsaPrivateKey.getInstance(privateKeyInfo.parsePrivateKey())
+        }.getOrElse { error ->
+            throw KadbCertException.PolicyViolation("Failed to parse RSA private key parameters", error)
+        }
+
+        return generateRsaPublicKey(encodedRsaPrivate.modulus, encodedRsaPrivate.publicExponent)
+    }
+
+    private fun generateRsaPublicKey(modulus: BigInteger, publicExponent: BigInteger): PublicKey {
+        val spec = RSAPublicKeySpec(modulus, publicExponent)
         return KeyFactory.getInstance("RSA").generatePublic(spec)
     }
 

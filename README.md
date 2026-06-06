@@ -6,7 +6,7 @@ Kadb is a Kotlin Multiplatform ADB client library for talking directly to `adbd`
 
 It is intended for apps and tools that need shell, sync, install, pairing, or port forwarding without embedding the full `adb` CLI or server stack.
 
-[Platform Notes](docs/platform.md) · [Host Identity](docs/kadbcert.md) · [Docs Index](docs/README.md)
+[Platform Notes](docs/platform.md) · [mDNS Discovery](docs/mdns.md) · [Host Identity](docs/kadbcert.md) · [Docs Index](docs/README.md)
 
 ## Overview
 
@@ -21,7 +21,15 @@ Kadb is not a full adb server replacement. USB discovery, transport brokering, a
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:2.1.1")
+    implementation("com.flyfishxu:kadb:2.1.2")
+}
+```
+
+Optional mDNS discovery:
+
+```kotlin
+dependencies {
+    implementation("com.flyfishxu:kadb-mdns:2.1.2")
 }
 ```
 
@@ -43,6 +51,20 @@ Pair with a new Android 11+ device:
 Kadb.pair("10.0.0.175", 37755, "643102")
 ```
 
+Discover wireless debugging endpoints with the optional mDNS artifact:
+
+```kotlin
+val mdns = KadbMdnsAndroid(context)
+mdns.start()
+```
+
+```kotlin
+val mdns = KadbMdnsJvm()
+mdns.start()
+```
+
+Discovered endpoints can be passed to `Kadb.create(host, port)` or `Kadb.pair(host, port, code)`.
+
 ## API Overview
 
 | Capability | API |
@@ -54,6 +76,7 @@ Kadb.pair("10.0.0.175", 37755, "643102")
 | APK install | `install(...)`, `installMultiple(...)`, `uninstall(...)` |
 | Port forwarding | `tcpForward(...)` |
 | Transport reuse | `resetConnection()` |
+| Optional mDNS discovery | `KadbMdnsAndroid`, `KadbMdnsJvm` |
 
 ## Examples
 
@@ -96,7 +119,7 @@ Example JVM pairing dependency:
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:2.1.1")
+    implementation("com.flyfishxu:kadb:2.1.2")
     implementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
 }
 ```
@@ -112,6 +135,7 @@ More detail: [docs/platform.md](docs/platform.md)
 
 - [Documentation Index](docs/README.md)
 - [Platform Notes](docs/platform.md)
+- [mDNS Discovery](docs/mdns.md)
 - [KadbCert](docs/kadbcert.md)
 
 ## Acknowledgements

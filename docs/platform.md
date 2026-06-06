@@ -12,6 +12,7 @@ This page documents the platform-specific runtime requirements and behavior diff
 | APK install / uninstall | Yes | Yes |
 | TCP forward | Yes | Yes |
 | Wireless pairing | Yes | Yes |
+| Optional mDNS discovery | Yes | Yes |
 | USB discovery | No | No |
 
 ## Pairing Requirements
@@ -31,6 +32,8 @@ Basic connect / shell / sync / install usage does not require the same provider 
 - `minSdk 23`
 - direct client features are supported on Android targets
 - pairing support depends on TLS provider availability
+- optional mDNS discovery is provided by `com.flyfishxu:kadb-mdns`
+- mDNS discovery requires an explicit Android `Context` and uses platform `NsdManager`
 
 ### Pairing
 
@@ -58,6 +61,9 @@ The JVM target supports:
 - APK install / uninstall
 - TCP forward
 - wireless pairing
+- optional mDNS discovery through `com.flyfishxu:kadb-mdns`
+
+The JVM mDNS implementation uses JmDNS internally and does not require Android concepts such as `Context`.
 
 ### Pairing
 
@@ -67,7 +73,7 @@ Recommended setup:
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:2.1.1")
+    implementation("com.flyfishxu:kadb:2.1.2")
     implementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
 }
 ```
@@ -87,4 +93,5 @@ Further detail: [kadbcert.md](kadbcert.md)
 ## Related Docs
 
 - [Project README](../README.md)
+- [mDNS Discovery](mdns.md)
 - [KadbCert](kadbcert.md)

@@ -14,7 +14,7 @@ kotlin {
 
     android {
         namespace = "com.flyfishxu.kadb"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 23
 
         withJava()
@@ -63,7 +63,7 @@ mavenPublishing {
         signAllPublications()
     }
 
-    coordinates("com.flyfishxu", "kadb", "2.1.1")
+    coordinates("com.flyfishxu", "kadb", "2.1.2-6-SNAPSHOT")
 
     pom {
 

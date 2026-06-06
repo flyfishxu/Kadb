@@ -7,11 +7,11 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
 [versions]
-agp = "9.1.0"
-bc = "1.83"
-spake2 = "1.0.5"
-kotlin = "2.3.20"
-kotlinxCoroutinesCore = "1.10.2"
+agp = "9.1.1"
+bc = "1.84"
+spake2 = "1.1.1"
+kotlin = "2.4.0"
+kotlinxCoroutinesCore = "1.11.0"
 okio = "3.17.0"
 documentfile = "1.1.0"
 dokka = "2.1.0"

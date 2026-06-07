@@ -22,3 +22,4 @@ plugins {
 
 rootProject.name = "Kadb"
 include(":kadb")
+include(":demo")

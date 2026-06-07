@@ -2,16 +2,22 @@
 
 [plugins]
 
+androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlinCompose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
 [versions]
 agp = "9.1.1"
+activityCompose = "1.13.0"
 bc = "1.84"
+composeBom = "2026.05.01"
 spake2 = "1.1.1"
 kotlin = "2.4.0"
 kotlinxCoroutinesCore = "1.11.0"
+kotlinxCoroutinesAndroid = "1.11.0"
 okio = "3.17.0"
 documentfile = "1.1.0"
 dokka = "2.1.0"
@@ -20,11 +26,19 @@ conscrypt-java = "2.5.2"
 
 [libraries]
 
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bc" }
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bc" }
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-foundation = { module = "androidx.compose.foundation:foundation" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 spake2 = { module = "com.github.Flyfish233:spake2-java", version.ref = "spake2" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }

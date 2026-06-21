@@ -4,24 +4,24 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 
 internal class AndroidServiceInfoCallback(
-    private val onRegistrationFailed: (Int) -> Unit,
-    private val onServiceUpdated: (NsdServiceInfo) -> Unit,
-    private val onServiceLost: () -> Unit,
-    private val onUnregistered: () -> Unit
+    private val onRegistrationFailedAction: (Int) -> Unit,
+    private val onServiceUpdatedAction: (NsdServiceInfo) -> Unit,
+    private val onServiceLostAction: () -> Unit,
+    private val onUnregisteredAction: () -> Unit
 ) : NsdManager.ServiceInfoCallback {
     override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) {
-        onRegistrationFailed(errorCode)
+        onRegistrationFailedAction(errorCode)
     }
 
     override fun onServiceUpdated(serviceInfo: NsdServiceInfo) {
-        onServiceUpdated(serviceInfo)
+        onServiceUpdatedAction(serviceInfo)
     }
 
     override fun onServiceLost() {
-        onServiceLost()
+        onServiceLostAction()
     }
 
     override fun onServiceInfoCallbackUnregistered() {
-        onUnregistered()
+        onUnregisteredAction()
     }
 }

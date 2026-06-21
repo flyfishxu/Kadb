@@ -21,7 +21,7 @@ Kadb is not a full adb server replacement. USB discovery, transport brokering, a
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:2.1.2")
+    implementation("com.flyfishxu:kadb:2.1.3")
 }
 ```
 
@@ -29,7 +29,7 @@ Optional mDNS discovery:
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb-mdns:2.1.2")
+    implementation("com.flyfishxu:kadb-mdns:2.1.3")
 }
 ```
 
@@ -119,7 +119,7 @@ Example JVM pairing dependency:
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:2.1.2")
+    implementation("com.flyfishxu:kadb:2.1.3")
     implementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
 }
 ```

@@ -8,7 +8,7 @@ The module discovers ADB-related mDNS services only. It does not open ADB connec
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb-mdns:2.1.2")
+    implementation("com.flyfishxu:kadb-mdns:2.1.3")
 }
 ```
 
@@ -16,8 +16,8 @@ Use the core Kadb artifact separately when you also need ADB connections:
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:2.1.2")
-    implementation("com.flyfishxu:kadb-mdns:2.1.2")
+    implementation("com.flyfishxu:kadb:2.1.3")
+    implementation("com.flyfishxu:kadb-mdns:2.1.3")
 }
 ```
 

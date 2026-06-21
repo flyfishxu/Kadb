@@ -12,8 +12,6 @@ import com.flyfishxu.kadb.mdns.internal.MdnsServiceKey
 import com.flyfishxu.kadb.mdns.internal.toMdnsEndpoint
 import com.flyfishxu.kadb.mdns.internal.toMdnsServiceKey
 import kotlinx.coroutines.flow.StateFlow
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 class KadbMdnsAndroid(
     context: Context,
@@ -22,7 +20,6 @@ class KadbMdnsAndroid(
     private val applicationContext = context.applicationContext
     private val nsdManager = applicationContext.getSystemService(NsdManager::class.java)
     private val registry = MdnsRegistry(config)
-    private val callbackExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val callbacks = mutableMapOf<MdnsServiceKey, NsdManager.ServiceInfoCallback>()
     private val lock = Any()
     private var started = false
@@ -88,16 +85,8 @@ class KadbMdnsAndroid(
 
     override fun close() {
         stop()
-        val shouldShutdown = synchronized(lock) {
-            if (closed) {
-                false
-            } else {
-                closed = true
-                true
-            }
-        }
-        if (shouldShutdown) {
-            callbackExecutor.shutdownNow()
+        synchronized(lock) {
+            closed = true
         }
     }
 
@@ -178,7 +167,7 @@ class KadbMdnsAndroid(
         if (!shouldRegister) return
 
         runCatching {
-            nsdManager.registerServiceInfoCallback(serviceInfo, callbackExecutor, callback)
+            nsdManager.registerServiceInfoCallback(serviceInfo, applicationContext.mainExecutor, callback)
         }.onFailure {
             synchronized(lock) {
                 callbacks.remove(key, callback)

@@ -1,2 +1,4 @@
 jdk:
   - openjdk21
+INST_ARGS:
+  -PsignAllPublications=false

@@ -1,4 +1,4 @@
 jdk:
   - openjdk21
 before_install:
-  - export ORG_GRADLE_PROJECT_signing.required=false
+  - echo "signAllPublications=false" >> gradle.properties

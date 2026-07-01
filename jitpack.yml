@@ -1,4 +1,4 @@
 jdk:
   - openjdk21
-INST_ARGS:
-  -PsignAllPublications=false
+before_install:
+  - echo "signing.required=false" >> gradle.properties

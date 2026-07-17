@@ -89,14 +89,21 @@ class Kadb(
         return AdbPtyShellSession(AdbShellStream(open(service)))
     }
 
-    fun push(src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()) =
-        push(src.source(), remotePath, mode, lastModifiedMs)
+    fun push(src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()) {
+        src.source().use { source ->
+            push(source, remotePath, mode, lastModifiedMs)
+        }
+    }
 
     fun push(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
         openSync().use { it.send(source, remotePath, mode, lastModifiedMs) }
     }
 
-    fun pull(dst: File, remotePath: String) = pull(dst.sink(false), remotePath)
+    fun pull(dst: File, remotePath: String) {
+        dst.sink(false).use { sink ->
+            pull(sink, remotePath)
+        }
+    }
 
     fun pull(sink: Sink, remotePath: String) {
         openSync().use { it.recv(sink, remotePath) }
@@ -111,7 +118,9 @@ class Kadb(
 
     fun install(file: File, vararg options: String) {
         if (supportsFeature("cmd")) {
-            install(file.source(), file.length(), *options)
+            file.source().use { source ->
+                install(source, file.length(), *options)
+            }
         } else {
             pmInstall(file, *options)
         }
@@ -157,19 +166,37 @@ class Kadb(
     }
 
     fun installMultiple(apks: List<File>, vararg options: String) {
+        require(apks.isNotEmpty()) { "At least one APK is required" }
         val installOptions = nonBlankOptions(options)
         val sessionMode = installSessionMode()
         val sessionId = createInstallSession(apks.sumOf { it.length() }, installOptions, sessionMode)
-        val error = if (sessionMode.usesStreaming) {
-            apks.firstNotNullOfOrNull { apk ->
-                streamInstallWrite(apk, sessionId, sessionMode).takeIf { !it.startsWith("Success") }
+        val writeError = try {
+            if (sessionMode.usesStreaming) {
+                apks.firstNotNullOfOrNull { apk ->
+                    streamInstallWrite(apk, sessionId, sessionMode).takeIf { !it.startsWith("Success") }
+                }
+            } else {
+                apks.mapIndexedNotNull { index, apk ->
+                    pushAndWrite(apk, sessionId, index).takeIf { !it.startsWith("Success") }
+                }.firstOrNull()
             }
-        } else {
-            apks.mapIndexedNotNull { index, apk ->
-                pushAndWrite(apk, sessionId, index).takeIf { !it.startsWith("Success") }
-            }.firstOrNull()
+        } catch (error: Throwable) {
+            abandonSessionAfterFailure(sessionId, sessionMode, error)
+            throw error
         }
-        finalizeSession(sessionId, error, sessionMode)
+
+        if (writeError != null) {
+            val error = IOException("Install failed: $writeError")
+            abandonSessionAfterFailure(sessionId, sessionMode, error)
+            throw error
+        }
+
+        try {
+            finishSession(sessionId, "install-commit", sessionMode)
+        } catch (error: Throwable) {
+            abandonSessionAfterFailure(sessionId, sessionMode, error)
+            throw error
+        }
     }
 
     fun uninstall(packageName: String) {
@@ -182,7 +209,9 @@ class Kadb(
             listOf("pm", "uninstall", packageName)
         }
         val response = shell(buildShellCommand(command))
-        check(response.exitCode == 0) { "Uninstall failed: ${response.allOutput}" }
+        check(response.exitCode == 0 && response.allOutput.trimStart().startsWith("Success")) {
+            "Uninstall failed: ${response.allOutput}"
+        }
     }
 
     // AOSP non-abb install path opens exec:cmd services and applies shell escaping per argument.
@@ -320,7 +349,9 @@ class Kadb(
             apk.name,
             "-"
         ).use { stream ->
-            stream.sink.writeAll(apk.source())
+            apk.source().use { source ->
+                stream.sink.writeAll(source)
+            }
             stream.sink.flush()
             stream.source.readUtf8()
         }
@@ -363,8 +394,7 @@ class Kadb(
         runCatching { shell(buildDeleteDeviceFileCommand(remotePath)) }
     }
 
-    private fun finalizeSession(sessionId: String, error: String?, sessionMode: InstallSessionMode) {
-        val finalCommand = if (error == null) "install-commit" else "install-abandon"
+    private fun finishSession(sessionId: String, finalCommand: String, sessionMode: InstallSessionMode) {
         // AOSP finalizes sessions with install-commit/install-abandon on the same install command family.
         // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/client/adb_install.cpp#653
         val output = when (sessionMode) {
@@ -378,7 +408,16 @@ class Kadb(
             }
         }
         check(output.startsWith("Success")) { "Failed to finalize session: $output" }
-        error?.let { throw IOException("Install failed: $it") }
+    }
+
+    private fun abandonSessionAfterFailure(
+        sessionId: String,
+        sessionMode: InstallSessionMode,
+        originalError: Throwable
+    ) {
+        runCatching {
+            finishSession(sessionId, "install-abandon", sessionMode)
+        }.exceptionOrNull()?.let(originalError::addSuppressed)
     }
 
     // Shell fallback builds one command string; mirror AOSP argv behavior by dropping empty args first.

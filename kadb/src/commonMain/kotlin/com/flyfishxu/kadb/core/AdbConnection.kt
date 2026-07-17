@@ -274,7 +274,7 @@ internal class AdbConnection internal constructor(
 
         private fun decodeOkayAckBytes(message: AdbMessage, delayedAckEnabled: Boolean): Int {
             require(message.command == AdbProtocol.CMD_OKAY) { "Expected OKAY message, got ${message.command}" }
-            return when (message.payloadLength) {
+            val ackBytes = when (message.payloadLength) {
                 0 -> {
                     if (delayedAckEnabled) {
                         throw IOException("Delayed ACK stream missing OKAY payload for localId: ${message.arg1.toString(16)}")
@@ -293,6 +293,10 @@ internal class AdbConnection internal constructor(
 
                 else -> throw IOException("Invalid OKAY payload size: ${message.payloadLength}")
             }
+            if (delayedAckEnabled && ackBytes <= 0) {
+                throw IOException("Invalid delayed ACK byte count: $ackBytes")
+            }
+            return ackBytes
         }
     }
 }

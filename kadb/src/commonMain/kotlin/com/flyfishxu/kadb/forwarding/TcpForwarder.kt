@@ -22,7 +22,9 @@ import okio.*
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.ServerSocket
+import java.net.Socket
 import java.net.SocketException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -34,24 +36,34 @@ internal class TcpForwarder(
     private val hostPort: Int,
     private val targetPort: Int,
 ) : AutoCloseable {
+    private companion object {
+        const val FORWARD_BUFFER_SIZE = 64 * 1024L
+    }
 
+    @Volatile
     private var state: State = State.STOPPED
     private var serverThread: Thread? = null
     private var server: ServerSocket? = null
     private var clientExecutor: ExecutorService? = null
+    private val activeClients = ConcurrentHashMap.newKeySet<Socket>()
+    private val activeStreams = ConcurrentHashMap.newKeySet<com.flyfishxu.kadb.stream.AdbStream>()
+    @Volatile
+    private var startupError: Throwable? = null
 
     fun start() {
         check(state == State.STOPPED) { "Forwarder is already started at port $hostPort" }
 
         moveToState(State.STARTING)
+        startupError = null
 
         clientExecutor = Executors.newCachedThreadPool()
         serverThread = thread {
             try {
                 handleForwarding()
-            } catch (_: SocketException) {
-                // Do nothing
+            } catch (e: SocketException) {
+                if (state == State.STARTING) startupError = e
             } catch (e: IOException) {
+                if (state == State.STARTING) startupError = e
                 log { "could not start TCP port forwarding: ${e.message}" }
             } finally {
                 moveToState(State.STOPPED)
@@ -59,7 +71,13 @@ internal class TcpForwarder(
         }
 
         waitFor(10, 5000) {
-            state == State.STARTED
+            state == State.STARTED || state == State.STOPPED
+        }
+        if (state != State.STARTED) {
+            clientExecutor?.shutdownNow()
+            clientExecutor = null
+            serverThread = null
+            throw IOException("Could not start TCP port forwarding on port $hostPort", startupError)
         }
     }
 
@@ -71,12 +89,14 @@ internal class TcpForwarder(
 
         while (!Thread.interrupted()) {
             val client = serverRef.accept()
+            activeClients += client
 
             clientExecutor?.execute {
                 var adbStream: com.flyfishxu.kadb.stream.AdbStream? = null
                 var readerThread: Thread? = null
                 try {
                     adbStream = kadb.open("tcp:$targetPort")
+                    activeStreams += adbStream
                     val stream = adbStream
                     readerThread = thread {
                         try {
@@ -89,7 +109,9 @@ internal class TcpForwarder(
                         stream.source, client.sink().buffer()
                     )
                 } finally {
+                    adbStream?.let(activeStreams::remove)
                     adbStream?.close()
+                    activeClients.remove(client)
                     client.close()
                     readerThread?.interrupt()
                 }
@@ -105,18 +127,23 @@ internal class TcpForwarder(
         // Make sure that we are not stopping the server while it is in a transient state
         // to avoid surprises
         waitFor(10, 5000) {
-            state == State.STARTED
+            state != State.STARTING
         }
+        if (state == State.STOPPED) return
 
         moveToState(State.STOPPING)
 
         server?.close()
         server = null
+        activeClients.toList().forEach { runCatching { it.close() } }
+        activeStreams.toList().forEach { runCatching { it.close() } }
         serverThread?.interrupt()
         serverThread = null
-        clientExecutor?.shutdown()
+        clientExecutor?.shutdownNow()
         clientExecutor?.awaitTermination(5, TimeUnit.SECONDS)
         clientExecutor = null
+        activeClients.clear()
+        activeStreams.clear()
 
         waitFor(10, 5000) {
             state == State.STOPPED
@@ -127,7 +154,7 @@ internal class TcpForwarder(
         try {
             while (!Thread.interrupted()) {
                 try {
-                    if (source.read(sink.buffer, 256) >= 0) {
+                    if (source.read(sink.buffer, FORWARD_BUFFER_SIZE) >= 0) {
                         sink.flush()
                     } else {
                         return

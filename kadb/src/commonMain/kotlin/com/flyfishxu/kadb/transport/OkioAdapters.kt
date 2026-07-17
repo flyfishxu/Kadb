@@ -90,9 +90,9 @@ internal fun TransportChannel.asOkioSink(writeTimeoutMs: Long = 0L): Sink = obje
             val copied = source.read(array, offset, toWrite)
             require(copied > 0) { "Unexpected EOF while reading from buffer" }
 
-            scratch.clear()
-            scratch.put(array, offset, copied)
-            scratch.flip()
+            // Buffer.read() filled the backing array directly; only expose the written range.
+            scratch.position(0)
+            scratch.limit(copied)
             runBlocking { writeExactly(scratch, writeTimeoutMs, TimeUnit.MILLISECONDS) }
             remaining -= copied
         }

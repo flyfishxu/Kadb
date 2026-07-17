@@ -46,4 +46,18 @@ class KadbMdnsJvmTest {
         assertEquals(MdnsServiceType.entries.map { it.dnsType }.toSet(), backend.removedListenerTypes)
         assertTrue(backend.closed)
     }
+
+    @Test
+    fun registrationFailureRollsBackListenersAndClosesBackend() {
+        val backend = FakeJmDnsBackend().apply {
+            failOnAddType = MdnsServiceType.TLS_CONNECT.dnsType
+        }
+        val mdns = KadbMdnsJvm(config = MdnsConfig(), backendFactory = { listOf(backend) })
+
+        mdns.start()
+
+        assertEquals(MdnsStatus.FAILED, mdns.state.value.status)
+        assertTrue(backend.closed)
+        assertTrue(backend.removedListenerTypes.isNotEmpty())
+    }
 }

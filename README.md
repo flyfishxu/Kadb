@@ -96,6 +96,18 @@ Kadb.create("127.0.0.1", 5555).use { kadb ->
 }
 ```
 
+For large transfers over a higher-latency Wi-Fi link, opt in to ADB delayed acknowledgements:
+
+```kotlin
+val options = KadbOptions(delayedAckMode = DelayedAckMode.ENABLED)
+Kadb.create("192.168.1.20", 5555, options = options).use { kadb ->
+    kadb.push(largeFile, "/data/local/tmp/large.bin")
+}
+```
+
+The peer must also advertise `delayed_ack`. `AOSP_DEFAULT` follows adb's host policy: the JVM target
+uses `ADB_BURST_MODE=1`, while Android leaves the feature disabled unless explicitly enabled.
+
 Forward a TCP port:
 
 ```kotlin

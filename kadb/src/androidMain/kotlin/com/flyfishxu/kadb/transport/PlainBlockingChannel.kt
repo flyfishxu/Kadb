@@ -45,16 +45,25 @@ internal class PlainBlockingChannel private constructor(
         get() = socket.remoteSocketAddress as InetSocketAddress
 
     override suspend fun read(dst: ByteBuffer, timeout: Long, unit: TimeUnit): Int {
+        if (!dst.hasRemaining()) return 0
         val oldTimeout = socket.soTimeout
         try {
             socket.soTimeout = if (timeout > 0) unit.toMillis(timeout).coerceAtMost(Int.MAX_VALUE.toLong()).toInt() else 0
             val max = min(dst.remaining(), 64 * 1024)
-            val buffer = ByteArray(max)
-            val read = input.read(buffer)
+            val read = if (dst.hasArray()) {
+                input.read(dst.array(), dst.arrayOffset() + dst.position(), max)
+            } else {
+                val buffer = ByteArray(max)
+                val count = input.read(buffer)
+                if (count > 0) dst.put(buffer, 0, count)
+                count
+            }
             if (read <= 0) {
                 return -1
             }
-            dst.put(buffer, 0, read)
+            if (dst.hasArray()) {
+                dst.position(dst.position() + read)
+            }
             return read
         } finally {
             socket.soTimeout = oldTimeout
@@ -63,13 +72,14 @@ internal class PlainBlockingChannel private constructor(
 
     override suspend fun write(src: ByteBuffer, timeout: Long, unit: TimeUnit): Int {
         val max = min(src.remaining(), 64 * 1024)
-        val tmp = ByteArray(max)
-        val originalLimit = src.limit()
-        val originalPosition = src.position()
-        src.limit(originalPosition + max)
-        src.get(tmp)
-        src.limit(originalLimit)
-        output.write(tmp)
+        if (src.hasArray()) {
+            output.write(src.array(), src.arrayOffset() + src.position(), max)
+            src.position(src.position() + max)
+        } else {
+            val tmp = ByteArray(max)
+            src.get(tmp)
+            output.write(tmp)
+        }
         return max
     }
 

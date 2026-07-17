@@ -5,8 +5,10 @@ internal class FakeJmDnsBackend : JmDnsBackend {
     val removedListenerTypes = linkedSetOf<String>()
     var closed = false
         private set
+    var failOnAddType: String? = null
 
     override fun addServiceListener(type: String, listener: JmDnsServiceEvents) {
+        if (type == failOnAddType) error("Synthetic listener registration failure")
         listeners[type] = listener
     }
 

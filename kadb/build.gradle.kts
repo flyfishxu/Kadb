@@ -53,6 +53,12 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().con
     }
 }
 
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    if (System.getenv("KADB_EMULATOR_TESTS") != "1") {
+        exclude("**/KadbEmulatorIntegrationTest*")
+    }
+}
+
 signing {
     useGpgCmd()
 }

@@ -56,14 +56,27 @@ class KadbMdnsJvm(
             return
         }
 
-        val newRegistrations = buildList {
+        val newRegistrations = mutableListOf<Registration>()
+        try {
             createdBackends.forEach { backend ->
                 config.serviceTypes.forEach { serviceType ->
                     val listener = JvmMdnsServiceEvents(backend)
                     backend.addServiceListener(serviceType.dnsType, listener)
-                    add(Registration(backend, serviceType.dnsType, listener))
+                    newRegistrations += Registration(backend, serviceType.dnsType, listener)
                 }
             }
+        } catch (_: Throwable) {
+            newRegistrations.forEach { registration ->
+                runCatching {
+                    registration.backend.removeServiceListener(registration.type, registration.listener)
+                }
+            }
+            createdBackends.forEach { backend -> runCatching { backend.close() } }
+            synchronized(lock) {
+                started = false
+                registry.failed()
+            }
+            return
         }
 
         synchronized(lock) {

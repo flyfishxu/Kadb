@@ -102,6 +102,7 @@ class AdbSyncStream(
 ) : AutoCloseable {
 
     private val buffer = Buffer()
+    private var closed = false
     private val isWindowsHost =
         System.getProperty("os.name")?.startsWith("Windows", ignoreCase = true) == true
 
@@ -515,7 +516,12 @@ class AdbSyncStream(
     private fun readUInt32AsLong(): Long = stream.source.readIntLe().toLong() and 0xFFFF_FFFFL
 
     override fun close() {
-        writePacket(ID_QUIT, 0)
-        stream.close()
+        if (closed) return
+        closed = true
+        try {
+            writePacket(ID_QUIT, 0)
+        } finally {
+            stream.close()
+        }
     }
 }

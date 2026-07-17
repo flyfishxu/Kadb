@@ -41,6 +41,7 @@ class AdbStream internal constructor(
         private var bytesRead = 0
 
         override fun read(sink: Buffer, byteCount: Long): Long {
+            if (byteCount == 0L) return 0L
             val message = message() ?: return -1
 
             val bytesRemaining = message.payloadLength - bytesRead
@@ -53,15 +54,15 @@ class AdbStream internal constructor(
             sink.write(message.payload, bytesRead, bytesToRead)
 
             bytesRead += bytesToRead
-            if (delayedAckEnabled && bytesToRead > 0) {
-                adbWriter.writeOkay(localId, remoteId, bytesToRead)
-            }
-
             check(bytesRead <= message.payloadLength)
 
             if (bytesRead == message.payloadLength) {
                 this.message = null
-                if (!delayedAckEnabled) {
+                if (delayedAckEnabled) {
+                    if (message.payloadLength > 0) {
+                        adbWriter.writeOkay(localId, remoteId, message.payloadLength)
+                    }
+                } else {
                     adbWriter.writeOkay(localId, remoteId)
                 }
             }
@@ -111,7 +112,7 @@ class AdbStream internal constructor(
             val payloadLength = buffer.position()
             if (payloadLength == 0) return
             if (delayedAckEnabled) {
-                while (availableSendBytes <= 0) {
+                while (availableSendBytes < payloadLength) {
                     availableSendBytes += awaitAckBytes().toLong()
                 }
             }
@@ -133,7 +134,11 @@ class AdbStream internal constructor(
     private fun awaitAckBytes(): Int {
         val message = nextMessage(AdbProtocol.CMD_OKAY)
             ?: throw IOException("ADB stream closed before delayed ACK for localId: ${localId.toString(16)}")
-        return decodeOkayAckBytes(message)
+        return decodeOkayAckBytes(message).also { ackBytes ->
+            if (ackBytes <= 0) {
+                throw IOException("Invalid delayed ACK byte count: $ackBytes")
+            }
+        }
     }
 
     private fun decodeOkayAckBytes(message: AdbMessage): Int {

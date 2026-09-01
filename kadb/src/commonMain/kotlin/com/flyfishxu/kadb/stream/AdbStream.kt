@@ -25,6 +25,7 @@ import okio.*
 import java.io.IOException
 import java.lang.Integer.min
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicBoolean
 
 class AdbStream internal constructor(
     private val messageQueue: AdbMessageQueue,
@@ -35,7 +36,7 @@ class AdbStream internal constructor(
     private val delayedAckEnabled: Boolean = false,
     private val initialAvailableSendBytes: Long = 0
 ) : AutoCloseable {
-    private var isClosed = false
+    private val isClosed = AtomicBoolean(false)
     val source = object : Source {
         private var message: AdbMessage? = null
         private var bytesRead = 0
@@ -170,8 +171,7 @@ class AdbStream internal constructor(
     }
 
     private fun close(sendClose: Boolean) {
-        if (isClosed) return
-        isClosed = true
+        if (!isClosed.compareAndSet(false, true)) return
         try {
             if (sendClose) {
                 adbWriter.writeClose(localId, remoteId)

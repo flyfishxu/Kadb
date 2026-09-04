@@ -37,8 +37,11 @@ internal abstract class MessageQueue<V> {
     }
 
     fun stopListening(localId: Int) {
-        openStreams.remove(localId)
-        queues.remove(localId)
+        queueLock.lock {
+            openStreams.remove(localId)
+            queues.remove(localId)
+            queueCond.signalAll()
+        }
     }
 
     @TestOnly
@@ -64,7 +67,7 @@ internal abstract class MessageQueue<V> {
     protected abstract fun isCloseCommand(message: V): Boolean
 
     private fun poll(localId: Int, command: Int): V? {
-        val streamQueues = queues[localId] ?: throw IllegalStateException("Not listening for localId: $localId")
+        val streamQueues = queues[localId] ?: throw AdbStreamClosed(localId)
         val message = streamQueues[command]?.poll()
         if (message == null && !openStreams.contains(localId)) {
             throw AdbStreamClosed(localId)

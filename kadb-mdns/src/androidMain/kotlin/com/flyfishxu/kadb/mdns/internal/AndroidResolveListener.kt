@@ -4,14 +4,14 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 
 internal class AndroidResolveListener(
-    private val onServiceResolved: (NsdServiceInfo) -> Unit,
-    private val onResolveFailed: (Int) -> Unit
+    private val onServiceResolvedAction: (NsdServiceInfo) -> Unit,
+    private val onResolveFailedAction: (Int) -> Unit
 ) : NsdManager.ResolveListener {
     override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-        onResolveFailed(errorCode)
+        onResolveFailedAction(errorCode)
     }
 
     override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-        onServiceResolved(serviceInfo)
+        onServiceResolvedAction(serviceInfo)
     }
 }

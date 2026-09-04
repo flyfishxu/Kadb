@@ -28,9 +28,9 @@ class KadbMdnsAndroid(
     private val discoveryListeners = config.serviceTypes.associateWith { serviceType ->
         AndroidDiscoveryListener(
             serviceType = serviceType,
-            onStatusChanged = ::onStatusChanged,
-            onServiceFound = ::onServiceFound,
-            onServiceLost = ::onServiceLost
+            onStatusChangedAction = ::onStatusChanged,
+            onServiceFoundAction = ::onServiceFound,
+            onServiceLostAction = ::onServiceLost
         )
     }
 
@@ -109,8 +109,8 @@ class KadbMdnsAndroid(
             nsdManager.resolveService(
                 serviceInfo,
                 AndroidResolveListener(
-                    onServiceResolved = { resolvedInfo -> upsertService(resolvedInfo, serviceType) },
-                    onResolveFailed = { onStatusChanged(MdnsStatus.FAILED) }
+                    onServiceResolvedAction = { resolvedInfo -> upsertService(resolvedInfo, serviceType) },
+                    onResolveFailedAction = { onStatusChanged(MdnsStatus.FAILED) }
                 )
             )
         }
@@ -146,10 +146,10 @@ class KadbMdnsAndroid(
 
         val key = serviceInfo.toMdnsServiceKey(fallbackServiceType = serviceType) ?: return
         val callback = AndroidServiceInfoCallback(
-            onRegistrationFailed = { onStatusChanged(MdnsStatus.FAILED) },
-            onServiceUpdated = { updatedInfo -> upsertService(updatedInfo, serviceType) },
-            onServiceLost = { removeServiceByKey(key) },
-            onUnregistered = {
+            onRegistrationFailedAction = { onStatusChanged(MdnsStatus.FAILED) },
+            onServiceUpdatedAction = { updatedInfo -> upsertService(updatedInfo, serviceType) },
+            onServiceLostAction = { removeServiceByKey(key) },
+            onUnregisteredAction = {
                 synchronized(lock) {
                     callbacks.remove(key)
                 }

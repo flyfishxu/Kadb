@@ -5,6 +5,7 @@ import com.flyfishxu.kadb.cert.CertUtils.loadKeySet
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
 import com.flyfishxu.kadb.core.AdbConnection
 import com.flyfishxu.kadb.core.AdbProtocol
+import com.flyfishxu.kadb.exception.AdbStreamClosed
 import com.flyfishxu.kadb.forwarding.TcpForwarder
 import com.flyfishxu.kadb.pair.PairingConnectionCtx
 import com.flyfishxu.kadb.shell.AdbPtyShellSession
@@ -257,19 +258,6 @@ class Kadb(
         }
     }
 
-    private fun isRecoverableTransportOpenFailure(error: Throwable): Boolean {
-        return when (error) {
-            is EOFException -> true
-            is IOException, is IllegalStateException -> {
-                val message = error.message.orEmpty().lowercase()
-                OPEN_TRANSPORT_FAILURE_MARKERS.any(message::contains) ||
-                    error.cause?.let(::isRecoverableTransportOpenFailure) == true
-            }
-
-            else -> error.cause?.let(::isRecoverableTransportOpenFailure) == true
-        }
-    }
-
     private fun extractSessionId(response: String) =
         """\[(\w+)]""".toRegex().find(response)?.groupValues?.get(1) ?: throw IOException("Failed to create session")
 
@@ -455,18 +443,6 @@ class Kadb(
     }
 
     companion object {
-        private val OPEN_TRANSPORT_FAILURE_MARKERS = listOf(
-            "broken pipe",
-            "connection reset",
-            "connection aborted",
-            "socket closed",
-            "stream closed",
-            "transport closed",
-            "closed",
-            "eof",
-            "disconnected",
-            "connection closed"
-        )
         private const val SHELL_V2_FEATURE = "shell_v2"
         private const val SHELL_SERVICE_BASE = "shell"
         private const val SHELL_ARG_V2 = "v2"
@@ -516,6 +492,36 @@ class Kadb(
         this.open(destination).use { stream ->
             return stream.source.readUntil('\n'.code.toByte()).readString(Charsets.UTF_8)
         }
+    }
+}
+
+private val OPEN_TRANSPORT_FAILURE_MARKERS = listOf(
+    "broken pipe",
+    "connection reset",
+    "connection aborted",
+    "socket closed",
+    "stream closed",
+    "transport closed",
+    "closed",
+    "eof",
+    "disconnected",
+    "connection closed"
+)
+
+internal fun isRecoverableTransportOpenFailure(error: Throwable): Boolean {
+    return when (error) {
+        // A CLSE received for an OPEN means that the requested adbd service rejected
+        // the request (for example, a localabstract socket is not listening yet).
+        // The underlying transport remains healthy and must not be discarded.
+        is AdbStreamClosed -> false
+        is EOFException -> true
+        is IOException, is IllegalStateException -> {
+            val message = error.message.orEmpty().lowercase()
+            OPEN_TRANSPORT_FAILURE_MARKERS.any(message::contains) ||
+                error.cause?.let(::isRecoverableTransportOpenFailure) == true
+        }
+
+        else -> error.cause?.let(::isRecoverableTransportOpenFailure) == true
     }
 }
 

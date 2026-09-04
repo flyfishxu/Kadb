@@ -51,7 +51,7 @@ mavenPublishing {
         signAllPublications()
     }
 
-    coordinates("com.flyfishxu", "kadb-mdns", "2.1.3")
+    coordinates("com.flyfishxu", "kadb-mdns", "2.1.4")
 
     pom {
         name.set("Kadb mDNS")

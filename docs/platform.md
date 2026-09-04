@@ -73,7 +73,7 @@ Recommended setup:
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:2.1.3")
+    implementation("com.flyfishxu:kadb:2.1.4")
     implementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
 }
 ```

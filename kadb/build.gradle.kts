@@ -58,13 +58,20 @@ signing {
     useGpgCmd()
 }
 
+providers.gradleProperty("workspaceMavenRepository").orNull?.let { repositoryPath ->
+    publishing.repositories.maven {
+        name = "workspace"
+        url = uri(repositoryPath)
+    }
+}
+
 mavenPublishing {
     publishToMavenCentral()
     if (providers.gradleProperty("signAllPublications").map { it.toBoolean() }.orElse(true).get()) {
         signAllPublications()
     }
 
-    coordinates("com.flyfishxu", "kadb", "2.1.5-2-SNAPSHOT")
+    coordinates("com.flyfishxu", "kadb", "2.1.5-3-SNAPSHOT")
 
     pom {
 

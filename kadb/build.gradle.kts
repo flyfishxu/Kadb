@@ -18,6 +18,7 @@ kotlin {
         minSdk = 23
 
         withJava()
+        withHostTest {}
     }
 
     sourceSets {
@@ -63,7 +64,7 @@ mavenPublishing {
         signAllPublications()
     }
 
-    coordinates("com.flyfishxu", "kadb", "2.1.4")
+    coordinates("com.flyfishxu", "kadb", "2.1.5-2-SNAPSHOT")
 
     pom {
 

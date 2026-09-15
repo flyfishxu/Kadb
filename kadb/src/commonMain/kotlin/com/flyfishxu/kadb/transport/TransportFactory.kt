@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Flyfish-Xu
+ * Copyright (c) 2024 Flyfish233
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,6 +15,8 @@
 
 package com.flyfishxu.kadb.transport
 
+import com.flyfishxu.kadb.TcpKeepAlive
+
 internal expect object TransportFactory {
-    suspend fun connect(host: String, port: Int, connectTimeoutMs: Long): TransportChannel
+    suspend fun connect(host: String, port: Int, connectTimeoutMs: Long, tcpKeepAlive: TcpKeepAlive? = null): TransportChannel
 }

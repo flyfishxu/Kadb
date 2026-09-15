@@ -16,9 +16,10 @@
 package com.flyfishxu.kadb.transport
 
 import java.util.concurrent.TimeUnit
+import com.flyfishxu.kadb.TcpKeepAlive
 
 internal actual object TransportFactory {
-    actual suspend fun connect(host: String, port: Int, connectTimeoutMs: Long): TransportChannel {
-        return PlainNioChannel.connect(host, port, connectTimeoutMs, TimeUnit.MILLISECONDS)
+    actual suspend fun connect(host: String, port: Int, connectTimeoutMs: Long, tcpKeepAlive: TcpKeepAlive?): TransportChannel {
+        return PlainNioChannel.connect(host, port, connectTimeoutMs, TimeUnit.MILLISECONDS, tcpKeepAlive)
     }
 }

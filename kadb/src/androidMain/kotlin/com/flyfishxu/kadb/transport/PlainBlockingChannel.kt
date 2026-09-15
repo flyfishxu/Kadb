@@ -15,6 +15,7 @@
 
 package com.flyfishxu.kadb.transport
 
+import com.flyfishxu.kadb.TcpKeepAlive
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
@@ -26,13 +27,19 @@ internal class PlainBlockingChannel private constructor(
 ) : TransportChannel {
 
     companion object {
-        fun connect(host: String, port: Int, connectTimeoutMs: Long): PlainBlockingChannel {
+        fun connect(host: String, port: Int, connectTimeoutMs: Long, tcpKeepAlive: TcpKeepAlive? = null): PlainBlockingChannel {
+            require(connectTimeoutMs >= 0) { "Connect timeout must not be negative" }
             val socket = Socket()
-            socket.keepAlive = true
-            socket.tcpNoDelay = true
-            val timeout = connectTimeoutMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-            socket.connect(InetSocketAddress(host, port), timeout)
-            return PlainBlockingChannel(socket)
+            try {
+                socket.keepAlive = true
+                socket.tcpNoDelay = true
+                socket.connect(InetSocketAddress(host, port), connectTimeoutMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                tcpKeepAlive?.let { configureTcpKeepAlive(socket, it) }
+                return PlainBlockingChannel(socket)
+            } catch (error: Throwable) {
+                runCatching { socket.close() }
+                throw error
+            }
         }
     }
 
@@ -45,31 +52,38 @@ internal class PlainBlockingChannel private constructor(
         get() = socket.remoteSocketAddress as InetSocketAddress
 
     override suspend fun read(dst: ByteBuffer, timeout: Long, unit: TimeUnit): Int {
+        if (!dst.hasRemaining()) return 0
         val oldTimeout = socket.soTimeout
+        val readTimeout = if (timeout > 0) unit.toMillis(timeout).coerceIn(1, Int.MAX_VALUE.toLong()).toInt() else 0
+        val timeoutChanged = oldTimeout != readTimeout
         try {
-            socket.soTimeout = if (timeout > 0) unit.toMillis(timeout).coerceAtMost(Int.MAX_VALUE.toLong()).toInt() else 0
+            if (timeoutChanged) socket.soTimeout = readTimeout
             val max = min(dst.remaining(), 64 * 1024)
-            val buffer = ByteArray(max)
-            val read = input.read(buffer)
-            if (read <= 0) {
-                return -1
+            val read = if (dst.hasArray()) {
+                input.read(dst.array(), dst.arrayOffset() + dst.position(), max).also {
+                    if (it > 0) dst.position(dst.position() + it)
+                }
+            } else {
+                val buffer = ByteArray(max)
+                input.read(buffer).also { if (it > 0) dst.put(buffer, 0, it) }
             }
-            dst.put(buffer, 0, read)
             return read
         } finally {
-            socket.soTimeout = oldTimeout
+            if (timeoutChanged && !socket.isClosed) runCatching { socket.soTimeout = oldTimeout }
         }
     }
 
     override suspend fun write(src: ByteBuffer, timeout: Long, unit: TimeUnit): Int {
         val max = min(src.remaining(), 64 * 1024)
-        val tmp = ByteArray(max)
-        val originalLimit = src.limit()
-        val originalPosition = src.position()
-        src.limit(originalPosition + max)
-        src.get(tmp)
-        src.limit(originalLimit)
-        output.write(tmp)
+        if (max == 0) return 0
+        if (src.hasArray()) {
+            output.write(src.array(), src.arrayOffset() + src.position(), max)
+            src.position(src.position() + max)
+        } else {
+            val bytes = ByteArray(max)
+            src.get(bytes)
+            output.write(bytes)
+        }
         return max
     }
 

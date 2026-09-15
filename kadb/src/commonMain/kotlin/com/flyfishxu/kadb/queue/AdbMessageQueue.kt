@@ -20,17 +20,86 @@ package com.flyfishxu.kadb.queue
 import com.flyfishxu.kadb.core.AdbMessage
 import com.flyfishxu.kadb.core.AdbProtocol
 import com.flyfishxu.kadb.core.AdbReader
+import com.flyfishxu.kadb.exception.AdbStreamClosed
+import org.jetbrains.annotations.TestOnly
+import java.io.IOException
+import java.util.ArrayDeque
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.thread
+import kotlin.concurrent.withLock
 
-internal class AdbMessageQueue(private val adbReader: AdbReader) : AutoCloseable,
-    MessageQueue<AdbMessage>() {
+/** One transport reader detects EOF even when all streams are idle. */
+internal class AdbMessageQueue(
+    private val reader: AdbReader,
+    private val closeTransport: () -> Unit,
+) : AutoCloseable {
+    private val lock = ReentrantLock()
+    private val changed = lock.newCondition()
+    private val queues = mutableMapOf<Int, MutableMap<Int, ArrayDeque<AdbMessage>>>()
+    private val openStreams = mutableSetOf<Int>()
+    @Volatile private var failure: Throwable? = null
+    val isOpen: Boolean get() = failure == null
 
-    override fun readMessage() = adbReader.readMessage()
+    init {
+        thread(name = "kadb-reader", isDaemon = true) {
+            try {
+                while (isOpen) dispatch(reader.readMessage())
+            } catch (error: Throwable) {
+                terminate(error)
+            } finally {
+                runCatching { reader.close() }
+            }
+        }
+    }
 
-    override fun getLocalId(message: AdbMessage) = message.arg1
+    fun take(localId: Int, command: Int): AdbMessage = lock.withLock {
+        while (true) {
+            val stream = queues[localId] ?: throw AdbStreamClosed(localId)
+            stream[command]?.poll()?.let { return it }
+            if (localId !in openStreams) throw AdbStreamClosed(localId)
+            failure?.let { throw it }
+            changed.await()
+        }
+        @Suppress("UNREACHABLE_CODE") error("Unreachable")
+    }
 
-    override fun getCommand(message: AdbMessage) = message.command
+    fun startListening(localId: Int) = lock.withLock {
+        failure?.let { throw it }
+        openStreams.add(localId)
+        queues.getOrPut(localId) { mutableMapOf() }
+        Unit
+    }
 
-    override fun close() = adbReader.close()
+    fun stopListening(localId: Int) = lock.withLock {
+        openStreams.remove(localId)
+        queues.remove(localId)
+        changed.signalAll()
+    }
 
-    override fun isCloseCommand(message: AdbMessage) = message.command == AdbProtocol.CMD_CLSE
+    private fun dispatch(message: AdbMessage) = lock.withLock {
+        val localId = message.arg1
+        if (message.command == AdbProtocol.CMD_CLSE) {
+            openStreams.remove(localId)
+        } else {
+            queues[localId]?.getOrPut(message.command) { ArrayDeque() }?.add(message)
+        }
+        changed.signalAll()
+    }
+
+    private fun terminate(error: Throwable) {
+        lock.withLock {
+            if (failure != null) return
+            failure = error
+            changed.signalAll()
+        }
+        // Close the socket before any buffered reader/writer: unblock pending I/O first.
+        runCatching { closeTransport() }
+    }
+
+    override fun close() = terminate(IOException("ADB connection closed"))
+
+    @TestOnly
+    fun ensureEmpty() = lock.withLock {
+        check(queues.isEmpty() && openStreams.isEmpty()) { "ADB streams still open: ${queues.keys}" }
+    }
 }

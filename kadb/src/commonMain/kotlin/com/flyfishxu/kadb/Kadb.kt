@@ -32,7 +32,12 @@ class Kadb(
 ) : AutoCloseable {
 
     private var options: KadbOptions = KadbOptions()
-    private var connection: Pair<AdbConnection, TransportChannel>? = null
+    @Volatile private var connection: Pair<AdbConnection, TransportChannel>? = null
+    private val connectionLock = Any()
+    private val connectingLock = Any()
+    private var generation = 0
+    private var closed = false
+    private var connectingTransport: TransportChannel? = null
 
     private constructor(
         host: String,
@@ -44,7 +49,7 @@ class Kadb(
         this.options = options
     }
 
-    fun connectionCheck(): Boolean = connection?.second?.isOpen == true
+    fun connectionCheck(): Boolean = connection?.let { it.first.isOpen && it.second.isOpen } == true
 
     fun open(destination: String): AdbStream {
         return openStream(destination).second
@@ -91,13 +96,13 @@ class Kadb(
     }
 
     fun push(src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()) =
-        push(src.source(), remotePath, mode, lastModifiedMs)
+        src.source().use { push(it, remotePath, mode, lastModifiedMs) }
 
     fun push(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
         openSync().use { it.send(source, remotePath, mode, lastModifiedMs) }
     }
 
-    fun pull(dst: File, remotePath: String) = pull(dst.sink(false), remotePath)
+    fun pull(dst: File, remotePath: String) = dst.sink(false).use { pull(it, remotePath) }
 
     fun pull(sink: Sink, remotePath: String) {
         openSync().use { it.recv(sink, remotePath) }
@@ -112,7 +117,7 @@ class Kadb(
 
     fun install(file: File, vararg options: String) {
         if (supportsFeature("cmd")) {
-            install(file.source(), file.length(), *options)
+            file.source().use { install(it, file.length(), *options) }
         } else {
             pmInstall(file, *options)
         }
@@ -196,65 +201,79 @@ class Kadb(
 
     fun unroot() = restartAdb("unroot:")
 
-    override fun close() {
-        connection?.first?.close()
-        connection = null
+    override fun close() = clearConnection(permanently = true)
+
+    /** Discard the transport and reconnect lazily on the next command. */
+    fun resetConnection() = clearConnection(permanently = false)
+
+    private fun clearConnection(permanently: Boolean) {
+        val (previous, pending) = synchronized(connectionLock) {
+            closed = closed || permanently
+            generation += 1
+            (connection?.first to connectingTransport).also {
+                connection = null
+                connectingTransport = null
+            }
+        }
+        pending?.close()
+        previous?.close()
     }
 
-    /**
-     * Reset current transport only.
-     * The Kadb instance remains reusable and reconnects lazily on next command.
-     */
-    fun resetConnection() {
-        connection?.first?.close()
-        connection = null
+    private fun connection(): AdbConnection = synchronized(connectingLock) {
+        val expectedGeneration = synchronized(connectionLock) {
+            if (closed) throw IOException("Kadb is closed")
+            connection?.takeIf { it.first.isOpen && it.second.isOpen }?.let { return it.first }
+            generation
+        }
+        val created = newConnection(expectedGeneration)
+        val adopted = synchronized(connectionLock) {
+            if (closed || generation != expectedGeneration) false
+            else { connection = created; true }
+        }
+        if (!adopted) {
+            created.first.close()
+            throw IOException("ADB connection was closed while connecting")
+        }
+        created.first
     }
 
-    private fun connection(): AdbConnection {
-        val current = connection
-        return if (current == null || !current.second.isOpen) {
-            newConnection().also { connection = it }.first
-        } else current.first
-    }
-
-    private fun newConnection(): Pair<AdbConnection, TransportChannel> {
-        return runBlocking {
+    private fun newConnection(expectedGeneration: Int): Pair<AdbConnection, TransportChannel> = runBlocking {
+        try {
             AdbConnection.connect(
                 host = host,
                 port = port,
                 hostKeySet = loadKeySet(),
                 options = options,
                 connectTimeoutMs = connectTimeout,
-                ioTimeoutMs = socketTimeout
+                ioTimeoutMs = socketTimeout,
+                onTransportCreated = { transport ->
+                    synchronized(connectionLock) {
+                        if (closed || generation != expectedGeneration) {
+                            transport.close()
+                            throw IOException("ADB connection was cancelled")
+                        }
+                        connectingTransport = transport
+                    }
+                }
             )
+        } finally {
+            synchronized(connectionLock) { connectingTransport = null }
         }
     }
 
-    private fun openStream(
-        destination: String,
-        retryOnStaleTransport: Boolean = true
-    ): Pair<AdbConnection, AdbStream> {
+    private fun openStream(destination: String): Pair<AdbConnection, AdbStream> {
         val conn = connection()
         return try {
             conn to conn.open(destination)
-        } catch (t: Throwable) {
-            if (!isRecoverableTransportOpenFailure(t)) {
-                throw t
+        } catch (error: Throwable) {
+            if (isRecoverableTransportOpenFailure(error)) {
+                synchronized(connectionLock) {
+                    if (connection?.first === conn) connection = null
+                }
+                conn.close()
             }
-            discardConnection(conn)
-            if (!retryOnStaleTransport) {
-                throw t
-            }
-            openStream(destination, retryOnStaleTransport = false)
-        }
-    }
-
-    private fun discardConnection(failedConnection: AdbConnection) {
-        val current = connection
-        if (current?.first === failedConnection) {
-            resetConnection()
-        } else {
-            runCatching { failedConnection.close() }
+            // The device may have executed OPEN before its reply was lost. Never replay it.
+            throw error
         }
     }
 
@@ -308,7 +327,7 @@ class Kadb(
             apk.name,
             "-"
         ).use { stream ->
-            stream.sink.writeAll(apk.source())
+            apk.source().use { stream.sink.writeAll(it) }
             stream.sink.flush()
             stream.source.readUtf8()
         }

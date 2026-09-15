@@ -20,6 +20,7 @@ package com.flyfishxu.kadb.stream
 import com.flyfishxu.kadb.core.AdbMessage
 import com.flyfishxu.kadb.core.AdbProtocol
 import com.flyfishxu.kadb.core.AdbWriter
+import com.flyfishxu.kadb.exception.AdbStreamClosed
 import com.flyfishxu.kadb.queue.AdbMessageQueue
 import okio.*
 import java.io.IOException
@@ -42,6 +43,8 @@ class AdbStream internal constructor(
         private var bytesRead = 0
 
         override fun read(sink: Buffer, byteCount: Long): Long {
+            require(byteCount >= 0)
+            if (byteCount == 0L) return 0L
             val message = message() ?: return -1
 
             val bytesRemaining = message.payloadLength - bytesRead
@@ -160,9 +163,12 @@ class AdbStream internal constructor(
     private fun nextMessage(command: Int): AdbMessage? {
         return try {
             messageQueue.take(localId, command)
-        } catch (_: IOException) {
+        } catch (_: AdbStreamClosed) {
             close(sendClose = false)
-            return null
+            null
+        } catch (error: IOException) {
+            close(sendClose = false)
+            throw error
         }
     }
 

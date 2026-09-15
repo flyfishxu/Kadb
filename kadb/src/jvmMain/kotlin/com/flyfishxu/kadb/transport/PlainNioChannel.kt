@@ -15,6 +15,7 @@
 
 package com.flyfishxu.kadb.transport
 
+import com.flyfishxu.kadb.TcpKeepAlive
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
@@ -32,7 +33,7 @@ internal class PlainNioChannel private constructor(
 ) : TransportChannel {
 
     companion object {
-        suspend fun connect(host: String, port: Int, timeout: Long, unit: TimeUnit): PlainNioChannel {
+        suspend fun connect(host: String, port: Int, timeout: Long, unit: TimeUnit, tcpKeepAlive: TcpKeepAlive? = null): PlainNioChannel {
             val group = TransportRuntime.channelGroup
             val ch = if (group != null) AsynchronousSocketChannel.open(group) else AsynchronousSocketChannel.open()
             try {
@@ -63,6 +64,7 @@ internal class PlainNioChannel private constructor(
                 try {
                     ch.setOption(StandardSocketOptions.TCP_NODELAY, true)
                     ch.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
+                    tcpKeepAlive?.let { configureTcpKeepAlive(ch, it) }
                 } catch (_: Throwable) {
                 }
             } catch (t: Throwable) {

@@ -34,7 +34,8 @@ internal class AdbConnection internal constructor(
 ) : AutoCloseable {
 
     private val random = Random()
-    private val messageQueue = AdbMessageQueue(adbReader)
+    private val messageQueue = AdbMessageQueue(adbReader) { closeable?.close() }
+    val isOpen: Boolean get() = messageQueue.isOpen
     private val delayedAckEnabled = supportedFeatures.contains(AdbProtocol.FEATURE_DELAYED_ACK)
 
     @Throws(IOException::class)
@@ -87,12 +88,8 @@ internal class AdbConnection internal constructor(
     }
 
     override fun close() {
-        try {
-            messageQueue.close()
-            adbWriter.close()
-            closeable?.close()
-        } catch (_: Throwable) {
-        }
+        messageQueue.close()
+        runCatching { adbWriter.close() }
     }
 
     companion object {
@@ -102,17 +99,19 @@ internal class AdbConnection internal constructor(
             hostKeySet: HostKeySet,
             options: KadbOptions = KadbOptions(),
             connectTimeoutMs: Int = 10_000,
-            ioTimeoutMs: Int = 0
+            ioTimeoutMs: Int = 0,
+            onTransportCreated: (TransportChannel) -> Unit = {}
         ): Pair<AdbConnection, TransportChannel> {
             val connectTimeout = connectTimeoutMs.toLong()
             val ioTimeout = ioTimeoutMs.toLong()
             var authKeyIndex = 0
 
-            var channel: TransportChannel = TransportFactory.connect(host, port, connectTimeout)
+            var channel: TransportChannel = TransportFactory.connect(host, port, connectTimeout, options.tcpKeepAlive)
             var reader = AdbReader(channel.asOkioSource(ioTimeout))
             var writer = AdbWriter(channel.asOkioSink(ioTimeout))
 
             try {
+                onTransportCreated(channel)
                 val advertisedFeatures = AdbProtocol.connectFeatures(options.delayedAckMode).toSet()
                 val connectPayload = AdbProtocol.connectPayload(
                     advertisedFeatures.toList()

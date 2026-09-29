@@ -18,6 +18,7 @@ dokka = "2.2.0"
 hiddenapibypass = "6.1"
 conscrypt-java = "2.7.0"
 jmdns = "3.6.3"
+javaDoesUsb = "1.3.0"
 
 [libraries]
 
@@ -31,3 +32,4 @@ documentfile = { group = "androidx.documentfile", name = "documentfile", version
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }
 conscrypt-java = { module = "org.conscrypt:conscrypt-openjdk-uber", version.ref = "conscrypt-java" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
+java-does-usb = { module = "net.codecrete.usb:java-does-usb", version.ref = "javaDoesUsb" }

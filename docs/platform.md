@@ -13,7 +13,7 @@ This page documents the platform-specific runtime requirements and behavior diff
 | TCP forward | Yes | Yes |
 | Wireless pairing | Yes | Yes |
 | Optional mDNS discovery | Yes | Yes |
-| USB Host discovery / connection | Yes, `KadbUsb` | No |
+| USB Host discovery / connection | Yes, `KadbUsb` | Yes, `KadbUsb` (Java 25+) |
 
 ## Pairing Requirements
 
@@ -68,6 +68,14 @@ The JVM target supports:
 - optional mDNS discovery through `com.flyfishxu:kadb-mdns`
 
 The JVM mDNS implementation uses JmDNS internally and does not require Android concepts such as `Context`.
+
+### USB
+
+Desktop USB uses Java Does USB 1.3.0, with native OS APIs on macOS, Linux, and Windows.
+Run on Java 25+ with `--enable-native-access=ALL-UNNAMED` (or grant the named
+`net.codecrete.usb` module native access when using the module path).
+See [desktop USB](usb.md#desktop-jvm) for permissions, driver requirements and testing.
+Only macOS arm64 has been hardware-validated in this checkout.
 
 ### Pairing
 

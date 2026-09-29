@@ -36,6 +36,7 @@ kotlin {
 
         jvmMain.dependencies {
             implementation(libs.spake2)
+            implementation(libs.java.does.usb)
         }
 
         commonTest.dependencies {
@@ -101,4 +102,18 @@ mavenPublishing {
             url.set("https://github.com/flyfishxu/Kadb.git")
         }
     }
+}
+
+// Explicit hardware task; plain jvmTest never enumerates or claims USB devices.
+val desktopUsbTestCompilation = kotlin.targets.getByName("jvm").compilations.getByName("test")
+tasks.register<JavaExec>("desktopUsbSmoke") {
+    group = "verification"
+    description = "Enumerate desktop USB devices, or test the device selected by -PusbSerial"
+    dependsOn("jvmTestClasses")
+    classpath(desktopUsbTestCompilation.output.allOutputs, desktopUsbTestCompilation.runtimeDependencyFiles)
+    mainClass.set("com.flyfishxu.kadb.usb.DesktopUsbSmoke")
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    args(providers.gradleProperty("usbSerial").orElse("").get(),
+        providers.gradleProperty("usbKey").orElse("").get(),
+        providers.gradleProperty("usbApk").orElse("").get())
 }

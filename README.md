@@ -6,16 +6,16 @@ Kadb is a Kotlin Multiplatform ADB client library for talking directly to `adbd`
 
 It is intended for apps and tools that need shell, sync, install, pairing, or port forwarding without embedding the full `adb` CLI or server stack.
 
-[Android USB](docs/usb.md) · [Platform Notes](docs/platform.md) · [mDNS Discovery](docs/mdns.md) · [Host Identity](docs/kadbcert.md) · [Docs Index](docs/README.md)
+[USB (Android and desktop)](docs/usb.md) · [Platform Notes](docs/platform.md) · [mDNS Discovery](docs/mdns.md) · [Host Identity](docs/kadbcert.md) · [Docs Index](docs/README.md)
 
 ## Overview
 
 - Direct Kotlin API for `adbd`
 - Android and JVM targets
-- Android USB Host connections, wireless pairing, shell, file transfer, install, and TCP forwarding
+- Android and desktop JVM USB connections, wireless pairing, shell, file transfer, install, and TCP forwarding
 - AOSP-aligned host behavior where practical
 
-Kadb is not a full adb server replacement. Desktop USB, transport brokering, and server-style device tracking are out of scope. Android USB Host is supported through `KadbUsb`.
+Kadb is not a full adb server replacement. Transport brokering and server-style device tracking are out of scope. Android USB Host and desktop JVM USB are supported through platform-specific `KadbUsb` APIs.
 
 ## Installation
 

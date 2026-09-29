@@ -7,7 +7,10 @@ data class KadbOptions(
     /**
      * Controls whether the host advertises the `delayed_ack` feature in CNXN.
      */
-    val delayedAckMode: DelayedAckMode = DelayedAckMode.AOSP_DEFAULT
+    val delayedAckMode: DelayedAckMode = DelayedAckMode.AOSP_DEFAULT,
+
+    /** Best effort platform TCP timings; unsupported platforms retain OS defaults. */
+    val tcpKeepAlive: TcpKeepAlive? = null
 )
 
 /**

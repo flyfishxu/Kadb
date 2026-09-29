@@ -8,7 +8,7 @@ plugins {
 kotlin {
     jvm {
         kotlin {
-            jvmToolchain(21)
+            jvmToolchain(25)
         }
     }
 
@@ -18,6 +18,7 @@ kotlin {
         minSdk = 23
 
         withJava()
+        withHostTest {}
     }
 
     sourceSets {
@@ -57,13 +58,20 @@ signing {
     useGpgCmd()
 }
 
+providers.gradleProperty("workspaceMavenRepository").orNull?.let { repositoryPath ->
+    publishing.repositories.maven {
+        name = "workspace"
+        url = uri(repositoryPath)
+    }
+}
+
 mavenPublishing {
     publishToMavenCentral()
     if (providers.gradleProperty("signAllPublications").map { it.toBoolean() }.orElse(true).get()) {
         signAllPublications()
     }
 
-    coordinates("com.flyfishxu", "kadb", "2.1.4")
+    coordinates("com.flyfishxu", "kadb", "2.1.5-3-SNAPSHOT")
 
     pom {
 

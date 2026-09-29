@@ -203,11 +203,13 @@ class AdbSyncStream(
         while (true) {
             val read = source.read(buffer, SYNC_DATA_MAX.toLong())
             if (read == -1L) break
+            if (read == 0L) throw IOException("File source made no progress")
             stream.sink.apply {
                 writeFrameHeader(ID_DATA, read.toInt())
                 val sent = writeAll(this@AdbSyncStream.buffer)
                 check(read == sent)
-                flush()
+                // Let the ADB stream batch DATA frames up to its negotiated payload size.
+                // A filesystem Source may return just 8 KiB per read; each flush waits for OKAY.
             }
         }
         stream.sink.apply {

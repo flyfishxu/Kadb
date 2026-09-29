@@ -15,7 +15,6 @@
 
 package com.flyfishxu.kadb.transport
 
-import kotlinx.coroutines.runBlocking
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLEngine
@@ -204,24 +203,10 @@ internal class TlsNioChannel(
     override val isOpen get() = net.isOpen
 
     override fun close() {
-        try {
-            engine.closeOutbound()
-            netOut.clear()
-            val result = try {
-                engine.wrap(EMPTY.duplicate(), netOut)
-            } catch (_: Throwable) {
-                null
-            }
-            if (result != null && result.status == SSLEngineResult.Status.OK && netOut.position() > 0) {
-                netOut.flip()
-                runCatching {
-                    runBlocking { net.writeExactly(netOut, 1_000, TimeUnit.MILLISECONDS) }
-                }
-            }
-        } catch (_: Throwable) {
-        } finally {
-            net.close()
-        }
+        // Cancellation must unblock reads/writes even if the peer has stopped receiving.
+        // Do not wait for a TLS close_notify write on a failed ADB transport.
+        net.close()
+        engine.closeOutbound()
     }
 
     private fun enlarge(buffer: ByteBuffer, minimum: Int): ByteBuffer {

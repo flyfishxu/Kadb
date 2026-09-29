@@ -31,6 +31,7 @@ class Kadb(
     private val socketTimeout: Int = 0
 ) : AutoCloseable {
 
+    private var transportConnector: (suspend () -> TransportChannel)? = null
     private var options: KadbOptions = KadbOptions()
     @Volatile private var connection: Pair<AdbConnection, TransportChannel>? = null
     private val connectionLock = Any()
@@ -246,6 +247,7 @@ class Kadb(
                 options = options,
                 connectTimeoutMs = connectTimeout,
                 ioTimeoutMs = socketTimeout,
+                transportConnector = transportConnector,
                 onTransportCreated = { transport ->
                     synchronized(connectionLock) {
                         if (closed || generation != expectedGeneration) {
@@ -482,6 +484,13 @@ class Kadb(
             socketTimeout: Int = 0,
             options: KadbOptions = KadbOptions()
         ): Kadb = Kadb(host, port, connectTimeout, socketTimeout, options)
+
+        internal fun createWithTransport(
+            options: KadbOptions,
+            connector: suspend () -> TransportChannel
+        ): Kadb = Kadb("", 0, options = options, connectTimeout = 0, socketTimeout = 0).also {
+            it.transportConnector = connector
+        }
 
         fun tryConnection(
             host: String,

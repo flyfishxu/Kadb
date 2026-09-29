@@ -1,5 +1,6 @@
 # Documentation
 
+- [Android USB](usb.md)
 - [Platform Notes](platform.md)
 - [mDNS Discovery](mdns.md)
 - [KadbCert](kadbcert.md)

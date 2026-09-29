@@ -13,7 +13,7 @@ This page documents the platform-specific runtime requirements and behavior diff
 | TCP forward | Yes | Yes |
 | Wireless pairing | Yes | Yes |
 | Optional mDNS discovery | Yes | Yes |
-| USB discovery | No | No |
+| USB Host discovery / connection | Yes, `KadbUsb` | No |
 
 ## Pairing Requirements
 
@@ -34,6 +34,10 @@ Basic connect / shell / sync / install usage does not require the same provider 
 - pairing support depends on TLS provider availability
 - optional mDNS discovery is provided by `com.flyfishxu:kadb-mdns`
 - mDNS discovery requires an explicit Android `Context` and uses platform `NsdManager`
+
+### USB Host
+
+See [Android USB](usb.md) for permission handling, connection ownership and device requirements.
 
 ### Pairing
 

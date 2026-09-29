@@ -21,13 +21,15 @@ import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 
 internal interface TransportChannel : Closeable {
+    /** USB endpoints can retain stream packets after releasing and reclaiming the interface. */
+    val mayHaveStaleStreamPackets: Boolean get() = false
     suspend fun read(dst: ByteBuffer, timeout: Long, unit: TimeUnit): Int
     suspend fun write(src: ByteBuffer, timeout: Long, unit: TimeUnit): Int
     suspend fun readExactly(dst: ByteBuffer, timeout: Long, unit: TimeUnit)
     suspend fun writeExactly(src: ByteBuffer, timeout: Long, unit: TimeUnit)
     suspend fun shutdownInput()
     suspend fun shutdownOutput()
-    val localAddress: InetSocketAddress
-    val remoteAddress: InetSocketAddress
+    val localAddress: InetSocketAddress?
+    val remoteAddress: InetSocketAddress?
     val isOpen: Boolean
 }

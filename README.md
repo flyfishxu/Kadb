@@ -1,3 +1,5 @@
+
+
 # Kadb
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.flyfishxu/kadb.svg)](https://central.sonatype.com/artifact/com.flyfishxu/kadb)
@@ -50,6 +52,8 @@ Pair with a new Android 11+ device:
 ```kotlin
 Kadb.pair("10.0.0.175", 37755, "643102")
 ```
+
+`Kadb.pair` is a suspend function, so call it from a coroutine.
 
 Discover wireless debugging endpoints with the optional mDNS artifact:
 

@@ -3,6 +3,7 @@
 
 # Gradle files
 .gradle/
+.kotlin/
 build/
 
 # Local configuration file (sdk path, etc)
@@ -16,6 +17,7 @@ captures/
 .externalNativeBuild/
 .cxx/
 *.apk
+*.aab
 *.aar
 output.json
 
@@ -36,4 +38,5 @@ google-services.json
 # Android Profiling
 *.hprof
 
-.kotlin/sessions/
+# Local development artifacts
+.codex-artifacts/

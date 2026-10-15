@@ -1,11 +1,16 @@
 package com.flyfishxu.kadb
 
+import com.flyfishxu.kadb.io.platformFileSystem
+
 import com.flyfishxu.kadb.cert.CertUtils.loadKeyPair
 import com.flyfishxu.kadb.cert.CertUtils.loadKeySet
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
+import com.flyfishxu.kadb.concurrent.BlockingLock
+import com.flyfishxu.kadb.concurrent.withLock
 import com.flyfishxu.kadb.core.AdbConnection
 import com.flyfishxu.kadb.core.AdbProtocol
 import com.flyfishxu.kadb.exception.AdbStreamClosed
+import com.flyfishxu.kadb.exception.PlatformInterruptedException
 import com.flyfishxu.kadb.forwarding.TcpForwarder
 import com.flyfishxu.kadb.pair.PairingConnectionCtx
 import com.flyfishxu.kadb.shell.AdbPtyShellSession
@@ -14,14 +19,13 @@ import com.flyfishxu.kadb.shell.AdbShellStream
 import com.flyfishxu.kadb.stream.AdbStream
 import com.flyfishxu.kadb.stream.AdbSyncStream
 import com.flyfishxu.kadb.transport.TransportChannel
+import kotlin.concurrent.Volatile
+import kotlin.time.Clock
+import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import okio.*
-import java.io.File
-import java.io.EOFException
-import java.io.IOException
-import kotlin.Throws
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
 class Kadb(
@@ -29,13 +33,15 @@ class Kadb(
     private val port: Int,
     private val connectTimeout: Int = 0,
     private val socketTimeout: Int = 0
-) : AutoCloseable {
+) : KadbFileCompatibility(), AutoCloseable {
+
+    override val fileClient: Kadb get() = this
 
     private var transportConnector: (suspend () -> TransportChannel)? = null
     private var options: KadbOptions = KadbOptions()
     @Volatile private var connection: Pair<AdbConnection, TransportChannel>? = null
-    private val connectionLock = Any()
-    private val connectingLock = Any()
+    private val connectionLock = BlockingLock()
+    private val connectingLock = BlockingLock()
     private var generation = 0
     private var closed = false
     private var connectingTransport: TransportChannel? = null
@@ -96,14 +102,14 @@ class Kadb(
         return AdbPtyShellSession(AdbShellStream(open(service)))
     }
 
-    fun push(src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()) =
-        src.source().use { push(it, remotePath, mode, lastModifiedMs) }
+    fun push(src: Path, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModifiedMillis()) =
+        platformFileSystem.source(src).use { push(it, remotePath, mode, lastModifiedMs) }
 
     fun push(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
         openSync().use { it.send(source, remotePath, mode, lastModifiedMs) }
     }
 
-    fun pull(dst: File, remotePath: String) = dst.sink(false).use { pull(it, remotePath) }
+    fun pull(dst: Path, remotePath: String) = platformFileSystem.sink(dst, mustCreate = false).use { pull(it, remotePath) }
 
     fun pull(sink: Sink, remotePath: String) {
         openSync().use { it.recv(sink, remotePath) }
@@ -116,9 +122,9 @@ class Kadb(
         return AdbSyncStream(stream, conn.featureSnapshot())
     }
 
-    fun install(file: File, vararg options: String) {
+    fun install(file: Path, vararg options: String) {
         if (supportsFeature("cmd")) {
-            file.source().use { install(it, file.length(), *options) }
+            platformFileSystem.source(file).use { install(it, file.fileSize(), *options) }
         } else {
             pmInstall(file, *options)
         }
@@ -133,9 +139,9 @@ class Kadb(
                 check(response.startsWith("Success")) { "Install failed: $response" }
             }
         } else {
-            val remotePath = "/data/local/tmp/kadb-install-${System.nanoTime()}.apk"
+            val remotePath = "/data/local/tmp/kadb-install-${Random.nextLong().toULong().toString(16)}.apk"
             try {
-                push(source, remotePath, mode = 420, lastModifiedMs = System.currentTimeMillis())
+                push(source, remotePath, mode = 420, lastModifiedMs = Clock.System.now().toEpochMilliseconds())
                 pmInstallRemote(remotePath, *options)
             } finally {
                 cleanupRemoteTempFile(remotePath)
@@ -151,10 +157,10 @@ class Kadb(
         check(response.allOutput.startsWith("Success")) { "Install failed: ${response.allOutput}" }
     }
 
-    private fun pmInstall(file: File, vararg options: String) {
+    private fun pmInstall(file: Path, vararg options: String) {
         val remotePath = "/data/local/tmp/${file.name}"
         val mode = readMode(file)
-        val lastModifiedMs = file.lastModified()
+        val lastModifiedMs = file.lastModifiedMillis()
         try {
             push(file, remotePath, mode = mode, lastModifiedMs = lastModifiedMs)
             pmInstallRemote(remotePath, *options)
@@ -163,10 +169,10 @@ class Kadb(
         }
     }
 
-    fun installMultiple(apks: List<File>, vararg options: String) {
+    fun installMultiple(apks: Collection<Path>, vararg options: String) {
         val installOptions = nonBlankOptions(options)
         val sessionMode = installSessionMode()
-        val sessionId = createInstallSession(apks.sumOf { it.length() }, installOptions, sessionMode)
+        val sessionId = createInstallSession(apks.sumOf { it.fileSize() }, installOptions, sessionMode)
         val error = if (sessionMode.usesStreaming) {
             apks.firstNotNullOfOrNull { apk ->
                 streamInstallWrite(apk, sessionId, sessionMode).takeIf { !it.startsWith("Success") }
@@ -208,7 +214,7 @@ class Kadb(
     fun resetConnection() = clearConnection(permanently = false)
 
     private fun clearConnection(permanently: Boolean) {
-        val (previous, pending) = synchronized(connectionLock) {
+        val (previous, pending) = connectionLock.withLock {
             closed = closed || permanently
             generation += 1
             (connection?.first to connectingTransport).also {
@@ -220,14 +226,14 @@ class Kadb(
         previous?.close()
     }
 
-    private fun connection(): AdbConnection = synchronized(connectingLock) {
-        val expectedGeneration = synchronized(connectionLock) {
+    private fun connection(): AdbConnection = connectingLock.withLock {
+        val expectedGeneration = connectionLock.withLock {
             if (closed) throw IOException("Kadb is closed")
             connection?.takeIf { it.first.isOpen && it.second.isOpen }?.let { return it.first }
             generation
         }
         val created = newConnection(expectedGeneration)
-        val adopted = synchronized(connectionLock) {
+        val adopted = connectionLock.withLock {
             if (closed || generation != expectedGeneration) false
             else { connection = created; true }
         }
@@ -249,7 +255,7 @@ class Kadb(
                 ioTimeoutMs = socketTimeout,
                 transportConnector = transportConnector,
                 onTransportCreated = { transport ->
-                    synchronized(connectionLock) {
+                    connectionLock.withLock {
                         if (closed || generation != expectedGeneration) {
                             transport.close()
                             throw IOException("ADB connection was cancelled")
@@ -259,7 +265,7 @@ class Kadb(
                 }
             )
         } finally {
-            synchronized(connectionLock) { connectingTransport = null }
+            connectionLock.withLock { connectingTransport = null }
         }
     }
 
@@ -269,7 +275,7 @@ class Kadb(
             conn to conn.open(destination)
         } catch (error: Throwable) {
             if (isRecoverableTransportOpenFailure(error)) {
-                synchronized(connectionLock) {
+                connectionLock.withLock {
                     if (connection?.first === conn) connection = null
                 }
                 conn.close()
@@ -318,18 +324,18 @@ class Kadb(
         return extractSessionId(response)
     }
 
-    private fun streamInstallWrite(apk: File, sessionId: String, sessionMode: InstallSessionMode): String {
+    private fun streamInstallWrite(apk: Path, sessionId: String, sessionMode: InstallSessionMode): String {
         return openInstallCommand(
             sessionMode,
             "package",
             "install-write",
             "-S",
-            apk.length().toString(),
+            apk.fileSize().toString(),
             sessionId,
             apk.name,
             "-"
         ).use { stream ->
-            apk.source().use { stream.sink.writeAll(it) }
+            platformFileSystem.source(apk).use { stream.sink.writeAll(it) }
             stream.sink.flush()
             stream.source.readUtf8()
         }
@@ -341,10 +347,10 @@ class Kadb(
         InstallSessionMode.PM_SHELL -> error("Legacy pm shell path does not open streamed install commands")
     }
 
-    private fun pushAndWrite(apk: File, sessionId: String, index: Int): String {
+    private fun pushAndWrite(apk: Path, sessionId: String, index: Int): String {
         val remotePath = "/data/local/tmp/${apk.name}"
         val mode = readMode(apk)
-        val lastModifiedMs = apk.lastModified()
+        val lastModifiedMs = apk.lastModifiedMillis()
         try {
             push(apk, remotePath, mode = mode, lastModifiedMs = lastModifiedMs)
             // Legacy install-write path uses shell command assembly with escape_arg() for each argv token.
@@ -355,7 +361,7 @@ class Kadb(
                         "pm",
                         "install-write",
                         "-S",
-                        apk.length().toString(),
+                        apk.fileSize().toString(),
                         sessionId,
                         index.toString(),
                         remotePath
@@ -474,7 +480,7 @@ class Kadb(
 
         suspend fun pair(host: String, port: Int, pairingCode: String, name: String = defaultDeviceName()) =
             withContext(Dispatchers.Default) {
-                PairingConnectionCtx(host, port, pairingCode.toByteArray(), loadKeyPair(), name).use { it.start() }
+                PairingConnectionCtx(host, port, pairingCode.encodeToByteArray(), loadKeyPair(), name).use { it.start() }
             }
 
         fun create(
@@ -509,7 +515,7 @@ class Kadb(
         fun tcpForward(host: String, port: Int, targetPort: Int) = Kadb(host, port).tcpForward(port, targetPort)
     }
 
-    @Throws(InterruptedException::class)
+    @Throws(PlatformInterruptedException::class)
     fun tcpForward(hostPort: Int, targetPort: Int): AutoCloseable {
         val forwarder = TcpForwarder(this, hostPort, targetPort)
         forwarder.start()
@@ -518,7 +524,7 @@ class Kadb(
 
     private fun restartAdb(destination: String): String {
         this.open(destination).use { stream ->
-            return stream.source.readUntil('\n'.code.toByte()).readString(Charsets.UTF_8)
+            return stream.source.readUntil('\n'.code.toByte()).readUtf8()
         }
     }
 }
@@ -562,4 +568,7 @@ private fun BufferedSource.readUntil(endByte: Byte): Buffer {
     }
 }
 
-internal expect fun Kadb.readMode(file: File): Int
+internal expect fun Kadb.readMode(file: Path): Int
+
+internal fun Path.lastModifiedMillis(): Long = platformFileSystem.metadata(platformFileSystem.canonicalize(this)).lastModifiedAtMillis ?: 0L
+internal fun Path.fileSize(): Long = platformFileSystem.metadata(platformFileSystem.canonicalize(this)).size ?: 0L

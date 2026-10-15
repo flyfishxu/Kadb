@@ -1,6 +1,6 @@
 package com.flyfishxu.kadb.pair
 
-internal actual fun PairingConnectionCtx.getConscryptClass(): Class<*> {
+internal actual fun PairingTlsConnection.getConscryptClass(): Class<*> {
     return try {
         Class.forName("org.conscrypt.Conscrypt")
     } catch (_: ClassNotFoundException) {

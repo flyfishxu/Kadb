@@ -1,0 +1,5 @@
+headers = kadb_crypto.h kadb_transport.h
+headerFilter = kadb_crypto.h kadb_transport.h
+package = com.flyfishxu.kadb.nativebridge
+staticLibraries = libkadb_native.a libssl.a libcrypto.a
+linkerOpts = -lc++

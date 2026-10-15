@@ -6,6 +6,9 @@ plugins {
 }
 
 kotlin {
+    iosArm64()
+    iosSimulatorArm64()
+
     jvm {
         kotlin {
             jvmToolchain(25)
@@ -39,6 +42,11 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().con
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
     }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest>().configureEach {
+    device.set(providers.gradleProperty("iosSimulatorDevice").orElse("booted"))
+    standalone.set(false)
 }
 
 signing {

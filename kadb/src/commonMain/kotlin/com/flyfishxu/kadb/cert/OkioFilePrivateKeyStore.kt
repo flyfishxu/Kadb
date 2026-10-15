@@ -1,5 +1,7 @@
 package com.flyfishxu.kadb.cert
 
+import com.flyfishxu.kadb.io.platformFileSystem
+
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
@@ -7,7 +9,7 @@ import kotlin.random.Random
 
 class OkioFilePrivateKeyStore(
     private val privateKeyPath: Path,
-    private val fileSystem: FileSystem = FileSystem.SYSTEM
+    private val fileSystem: FileSystem = platformFileSystem
 ) : KadbPrivateKeyStore {
 
     override fun readPrivateKeyPem(): ByteArray? {

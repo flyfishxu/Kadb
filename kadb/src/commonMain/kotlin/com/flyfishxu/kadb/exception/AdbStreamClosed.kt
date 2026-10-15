@@ -17,7 +17,7 @@
 
 package com.flyfishxu.kadb.exception
 
-import java.io.IOException
+import okio.IOException
 
 internal class AdbStreamClosed(localId: Int) :
-    IOException(String.format("ADB stream is closed for localId: %x", localId))
+    IOException("ADB stream is closed for localId: ${localId.toUInt().toString(16)}")

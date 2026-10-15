@@ -16,9 +16,6 @@
 
 package com.flyfishxu.kadb.cert
 
-import com.flyfishxu.kadb.pair.getBytes
-import okio.Buffer
-import org.jetbrains.annotations.VisibleForTesting
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -26,9 +23,7 @@ import java.security.InvalidKeyException
 import java.security.interfaces.RSAPublicKey
 import java.util.*
 import kotlin.Throws
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.math.ceil
+import org.jetbrains.annotations.VisibleForTesting
 
 internal object AndroidPubkey {
     /**
@@ -86,22 +81,15 @@ internal object AndroidPubkey {
      * @param name      Name without null terminator
      * @return Byte array containing the converted RSAPublicKey object
      */
-    @OptIn(ExperimentalEncodingApi::class)
     @JvmStatic
     // @Throws(InvalidKeyException::class)
-    fun encodeWithName(publicKey: RSAPublicKey, name: String): ByteArray {
-        val pkeySize = 4 * ceil(ANDROID_PUBKEY_ENCODED_SIZE / 3.0).toInt()
-        val buffer = Buffer().use {
-            it.write(Base64.encode(encode(publicKey)).toByteArray())
-            it.write(getUserInfo(name))
-        }
-        return buffer.readByteArray((pkeySize + name.length + 2).toLong())
-    }
+    fun encodeWithName(publicKey: RSAPublicKey, name: String): ByteArray =
+        encodeAdbPublicKeyWithName(encode(publicKey), name)
 
     // Taken from get_user_info except that a custom name is used instead of host@user
     @VisibleForTesting
     fun getUserInfo(name: String): ByteArray {
-        return getBytes(String.format(" %s\u0000", name), "UTF-8")
+        return " $name\u0000".encodeToByteArray()
     }
 
     /**

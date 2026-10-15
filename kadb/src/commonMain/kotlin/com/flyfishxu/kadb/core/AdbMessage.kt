@@ -21,7 +21,6 @@ import com.flyfishxu.kadb.shell.AdbShellPacketV2
 import com.flyfishxu.kadb.stream.SYNC_IDS
 import okio.Buffer
 import okio.BufferedSource
-import java.nio.charset.StandardCharsets
 
 internal class AdbMessage(
     val command: Int,
@@ -38,9 +37,9 @@ internal class AdbMessage(
     private fun payloadStr(): String {
         if (payloadLength == 0) return ""
         return when (command) {
-            AdbProtocol.CMD_AUTH -> if (arg0 == AdbProtocol.AUTH_TYPE_RSA_PUBLIC) String(payload) else "auth[${payloadLength}]"
+            AdbProtocol.CMD_AUTH -> if (arg0 == AdbProtocol.AUTH_TYPE_RSA_PUBLIC) payload.decodeToString() else "auth[${payloadLength}]"
             AdbProtocol.CMD_WRTE -> writePayloadStr()
-            AdbProtocol.CMD_OPEN -> String(payload, 0, payloadLength - 1)
+            AdbProtocol.CMD_OPEN -> payload.decodeToString(0, payloadLength - 1)
             else -> "payload[$payloadLength]"
         }
     }
@@ -59,14 +58,14 @@ internal class AdbMessage(
         val length = source.readIntLe()
         if (length != source.buffer.size.toInt()) return null
         if (id == AdbShellPacketV2.ID_EXIT) return "[shell] exit(${source.readByte()})"
-        val payload = String(payload, 5, payloadLength - 5)
+        val payload = payload.decodeToString(5, payloadLength)
         return "[shell] $payload"
     }
 
     private fun syncPayloadStr(): String? {
         val source: BufferedSource = getSource()
         if (source.buffer.size < 8) return null
-        val id = source.readString(4, StandardCharsets.UTF_8)
+        val id = source.readUtf8(4)
         if (id !in SYNC_IDS) return null
         val arg = source.readIntLe()
         return "[sync] $id($arg)"
@@ -76,7 +75,7 @@ internal class AdbMessage(
         return Buffer().apply { write(payload, 0, payloadLength) }
     }
 
-    private fun argStr(arg: Int) = String.format("%X", arg)
+    private fun argStr(arg: Int) = arg.toUInt().toString(16).uppercase()
 
     private fun commandStr() = when (command) {
         AdbProtocol.CMD_AUTH -> "AUTH"

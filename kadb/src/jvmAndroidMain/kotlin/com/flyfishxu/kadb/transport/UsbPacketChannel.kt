@@ -1,11 +1,11 @@
 package com.flyfishxu.kadb.transport
 
 import com.flyfishxu.kadb.core.AdbProtocol
-import java.io.Closeable
-import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.TimeUnit
+import okio.Closeable
+import okio.IOException
 
 /** One USB transfer, including its short-packet boundary. Reads may block until cancelled. */
 internal interface UsbBulkIo : Closeable {

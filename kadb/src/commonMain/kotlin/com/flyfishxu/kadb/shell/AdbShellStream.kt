@@ -1,8 +1,8 @@
 package com.flyfishxu.kadb.shell
 
 import com.flyfishxu.kadb.stream.AdbStream
-import java.io.IOException
 import kotlin.Throws
+import okio.IOException
 
 class AdbShellStream(
     private val stream: AdbStream
@@ -21,11 +21,11 @@ class AdbShellStream(
                 }
 
                 is AdbShellPacket.StdOut -> {
-                    output.append(String(packet.payload))
+                    output.append(packet.payload.decodeToString())
                 }
 
                 is AdbShellPacket.StdError -> {
-                    errorOutput.append(String(packet.payload))
+                    errorOutput.append(packet.payload.decodeToString())
                 }
             }
         }
@@ -48,7 +48,7 @@ class AdbShellStream(
 
     @Throws(IOException::class)
     fun write(string: String) {
-        write(string.toByteArray())
+        write(string.encodeToByteArray())
     }
 
     @Throws(IOException::class)

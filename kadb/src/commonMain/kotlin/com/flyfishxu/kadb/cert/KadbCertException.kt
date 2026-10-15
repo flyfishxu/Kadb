@@ -1,7 +1,5 @@
 package com.flyfishxu.kadb.cert
 
-import java.security.PrivateKey
-
 sealed class KadbCertException(message: String, cause: Throwable? = null) : RuntimeException(message, cause) {
     class PrivateKeyParseFailed(cause: Throwable? = null) : KadbCertException("Failed to parse private key", cause)
     class StoreReadFailed(cause: Throwable? = null) : KadbCertException("Failed to read identity from store", cause)

@@ -6,7 +6,7 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.security.NoSuchAlgorithmException
 
 @SuppressLint("PrivateApi")
-internal actual fun PairingConnectionCtx.getConscryptClass(): Class<*> {
+internal actual fun PairingTlsConnection.getConscryptClass(): Class<*> {
     return if (SslUtils.customConscrypt) {
         Class.forName("org.conscrypt.Conscrypt")
     } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {

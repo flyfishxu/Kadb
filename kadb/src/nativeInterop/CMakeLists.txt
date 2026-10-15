@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 3.22)
+project(KadbNative LANGUAGES C CXX)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BORINGSSL_PREFIX KADB_BSSL CACHE STRING "" FORCE)
+add_subdirectory("${BORINGSSL_SOURCE}" boringssl EXCLUDE_FROM_ALL)
+add_library(kadb_native STATIC cpp/kadb_crypto.c cpp/kadb_transport.c)
+target_compile_features(kadb_native PRIVATE c_std_11)
+target_compile_definitions(kadb_native PRIVATE BORINGSSL_PREFIX=KADB_BSSL)
+target_include_directories(kadb_native PRIVATE cinterop)
+target_link_libraries(kadb_native PRIVATE ssl crypto)
+set_target_properties(kadb_native ssl crypto PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")

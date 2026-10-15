@@ -16,6 +16,6 @@
 
 package com.flyfishxu.kadb.exception
 
-import java.io.IOException
+import okio.IOException
 
 class AdbAuthException : IOException("Need adb authority")

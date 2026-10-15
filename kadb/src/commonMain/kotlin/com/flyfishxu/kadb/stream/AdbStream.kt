@@ -22,12 +22,11 @@ import com.flyfishxu.kadb.core.AdbProtocol
 import com.flyfishxu.kadb.core.AdbWriter
 import com.flyfishxu.kadb.exception.AdbStreamClosed
 import com.flyfishxu.kadb.queue.AdbMessageQueue
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import okio.*
-import java.io.IOException
-import java.lang.Integer.min
-import java.nio.ByteBuffer
-import java.util.concurrent.atomic.AtomicBoolean
 
+@OptIn(ExperimentalAtomicApi::class)
 class AdbStream internal constructor(
     private val messageQueue: AdbMessageQueue,
     private val adbWriter: AdbWriter,
@@ -87,7 +86,8 @@ class AdbStream internal constructor(
     }.buffer()
 
     val sink = object : Sink {
-        private val buffer = ByteBuffer.allocate(outboundMaxPayloadSize)
+        private val buffer = ByteArray(outboundMaxPayloadSize)
+        private var bufferedBytes = 0
         private var availableSendBytes = initialAvailableSendBytes
 
         override fun write(source: Buffer, byteCount: Long) {
@@ -98,32 +98,32 @@ class AdbStream internal constructor(
         }
 
         private fun writeToBuffer(source: BufferedSource, byteCount: Long): Int {
-            val bytesToWrite = min(
-                buffer.remaining(),
+            val bytesToWrite = minOf(
+                buffer.size - bufferedBytes,
                 byteCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             )
-            val bytesWritten = source.read(buffer.array(), buffer.position(), bytesToWrite)
-            if (bytesWritten < 0) throw java.io.EOFException("EOF while writing ADB stream")
+            val bytesWritten = source.read(buffer, bufferedBytes, bytesToWrite)
+            if (bytesWritten < 0) throw EOFException("EOF while writing ADB stream")
 
-            buffer.position(buffer.position() + bytesWritten)
-            if (buffer.remaining() == 0) flush()
+            bufferedBytes += bytesWritten
+            if (bufferedBytes == buffer.size) flush()
 
             return bytesWritten
         }
 
         override fun flush() {
-            val payloadLength = buffer.position()
+            val payloadLength = bufferedBytes
             if (payloadLength == 0) return
             if (delayedAckEnabled) {
                 while (availableSendBytes <= 0) {
                     availableSendBytes += awaitAckBytes().toLong()
                 }
             }
-            adbWriter.writeWrite(localId, remoteId, buffer.array(), 0, payloadLength)
+            adbWriter.writeWrite(localId, remoteId, buffer, 0, payloadLength)
             if (delayedAckEnabled) {
                 availableSendBytes -= payloadLength.toLong()
             }
-            buffer.clear()
+            bufferedBytes = 0
             if (!delayedAckEnabled && nextMessage(AdbProtocol.CMD_OKAY) == null) {
                 throw IOException("ADB stream closed before OKAY for localId: ${localId.toString(16)}")
             }

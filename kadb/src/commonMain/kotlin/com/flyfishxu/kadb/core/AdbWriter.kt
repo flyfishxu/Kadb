@@ -17,13 +17,18 @@
 
 package com.flyfishxu.kadb.core
 
+import com.flyfishxu.kadb.concurrent.BlockingLock
+import com.flyfishxu.kadb.concurrent.withLock
+import com.flyfishxu.kadb.debug.currentThreadName
 import com.flyfishxu.kadb.debug.log
+import kotlin.concurrent.Volatile
+import okio.Buffer
 import okio.Sink
 import okio.buffer
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 internal class AdbWriter(sink: Sink) : AutoCloseable {
+
+    private val lock = BlockingLock()
 
     private val bufferedSink = sink.buffer()
     // Transport protocol starts at A_VERSION_MIN before CNXN completes.
@@ -57,11 +62,8 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
     )
 
     fun writeOpen(localId: Int, destination: String, arg1: Int = 0) {
-        val destinationBytes = destination.toByteArray()
-        val buffer = ByteBuffer.allocate(destinationBytes.size + 1)
-        buffer.put(destinationBytes)
-        buffer.put(0)
-        val payload = buffer.array()
+        val destinationBytes = destination.encodeToByteArray()
+        val payload = destinationBytes.copyOf(destinationBytes.size + 1)
         write(AdbProtocol.CMD_OPEN, localId, arg1, payload, 0, payload.size)
     }
 
@@ -75,10 +77,7 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
 
     fun writeOkay(localId: Int, remoteId: Int, ackBytes: Int? = null) {
         val payload = ackBytes?.let {
-            ByteBuffer.allocate(Int.SIZE_BYTES)
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .putInt(it)
-                .array()
+            Buffer().writeIntLe(it).readByteArray()
         }
         write(AdbProtocol.CMD_OKAY, localId, remoteId, payload, 0, payload?.size ?: 0)
     }
@@ -87,13 +86,13 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
         command: Int, arg0: Int, arg1: Int, payload: ByteArray?, offset: Int, length: Int
     ) {
         log {
-            "(${Thread.currentThread().name}) > ${
+            "(${currentThreadName()}) > ${
                 AdbMessage(
                     command, arg0, arg1, length, 0, 0, payload ?: ByteArray(0)
                 )
             }"
         }
-        synchronized(bufferedSink) {
+        lock.withLock {
             bufferedSink.apply {
                 writeIntLe(command)
                 writeIntLe(arg0)

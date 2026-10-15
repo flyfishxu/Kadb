@@ -17,23 +17,22 @@
 
 package com.flyfishxu.kadb.queue
 
+import com.flyfishxu.kadb.concurrent.BlockingLock
+import com.flyfishxu.kadb.concurrent.startReaderThread
+import com.flyfishxu.kadb.concurrent.withLock
 import com.flyfishxu.kadb.core.AdbMessage
 import com.flyfishxu.kadb.core.AdbProtocol
 import com.flyfishxu.kadb.core.AdbReader
 import com.flyfishxu.kadb.exception.AdbStreamClosed
-import org.jetbrains.annotations.TestOnly
-import java.io.IOException
-import java.util.ArrayDeque
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.thread
-import kotlin.concurrent.withLock
+import kotlin.concurrent.Volatile
+import okio.IOException
 
 /** One transport reader detects EOF even when all streams are idle. */
 internal class AdbMessageQueue(
     private val reader: AdbReader,
     private val closeTransport: () -> Unit,
 ) : AutoCloseable {
-    private val lock = ReentrantLock()
+    private val lock = BlockingLock()
     private val changed = lock.newCondition()
     private val queues = mutableMapOf<Int, MutableMap<Int, ArrayDeque<AdbMessage>>>()
     private val openStreams = mutableSetOf<Int>()
@@ -41,7 +40,7 @@ internal class AdbMessageQueue(
     val isOpen: Boolean get() = failure == null
 
     init {
-        thread(name = "kadb-reader", isDaemon = true) {
+        startReaderThread {
             try {
                 while (isOpen) dispatch(reader.readMessage())
             } catch (error: Throwable) {
@@ -55,7 +54,7 @@ internal class AdbMessageQueue(
     fun take(localId: Int, command: Int): AdbMessage = lock.withLock {
         while (true) {
             val stream = queues[localId] ?: throw AdbStreamClosed(localId)
-            stream[command]?.poll()?.let { return it }
+            stream[command]?.removeFirstOrNull()?.let { return it }
             if (localId !in openStreams) throw AdbStreamClosed(localId)
             failure?.let { throw it }
             changed.await()
@@ -98,7 +97,6 @@ internal class AdbMessageQueue(
 
     override fun close() = terminate(IOException("ADB connection closed"))
 
-    @TestOnly
     fun ensureEmpty() = lock.withLock {
         check(queues.isEmpty() && openStreams.isEmpty()) { "ADB streams still open: ${queues.keys}" }
     }

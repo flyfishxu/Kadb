@@ -83,3 +83,5 @@ actual fun Kadb.readMode(file: File): Int {
         mode
     }
 }
+
+internal actual fun Kadb.readMode(file: okio.Path): Int = readMode(file.toFile())

@@ -1,6 +1,8 @@
 package com.flyfishxu.kadb.cert
 
-import java.security.cert.X509Certificate
+import com.flyfishxu.kadb.concurrent.BlockingLock
+import com.flyfishxu.kadb.concurrent.withLock
+import kotlin.concurrent.Volatile
 
 object KadbCert {
     private sealed interface State {
@@ -9,7 +11,7 @@ object KadbCert {
         data class Broken(val cause: Throwable) : State
     }
 
-    private val lock = Any()
+    private val lock = BlockingLock()
 
     @Volatile
     private var store: KadbPrivateKeyStore = InMemoryPrivateKeyStore()
@@ -29,7 +31,7 @@ object KadbCert {
         additionalPrivateKeysPem: List<ByteArray> = emptyList()
     ) {
         validatePolicy(policy)
-        synchronized(lock) {
+        lock.withLock {
             this.store = store
             this.policy = policy
             this.additionalPrivateKeysPem = additionalPrivateKeysPem
@@ -39,11 +41,11 @@ object KadbCert {
         }
     }
 
-    fun ensureReady(): KadbIdentitySnapshot = synchronized(lock) {
+    fun ensureReady(): KadbIdentitySnapshot = lock.withLock {
         ensureReadyStateLocked().snapshot.deepCopy()
     }
 
-    fun rotate(): KadbIdentitySnapshot = synchronized(lock) {
+    fun rotate(): KadbIdentitySnapshot = lock.withLock {
         val previousReady = state as? State.Ready
         try {
             val material = CertUtils.generateNewIdentity(policy)
@@ -57,7 +59,7 @@ object KadbCert {
         }
     }
 
-    fun importIdentity(privateKeyPem: ByteArray, certificatePem: ByteArray? = null): KadbIdentitySnapshot = synchronized(lock) {
+    fun importIdentity(privateKeyPem: ByteArray, certificatePem: ByteArray? = null): KadbIdentitySnapshot = lock.withLock {
         val previousReady = state as? State.Ready
         try {
             val material = resolveImportedIdentity(privateKeyPem, certificatePem)
@@ -75,26 +77,26 @@ object KadbCert {
         return importIdentity(privateKeyPem, null)
     }
 
-    fun exportIdentityOrNull(): KadbIdentitySnapshot? = synchronized(lock) {
+    fun exportIdentityOrNull(): KadbIdentitySnapshot? = lock.withLock {
         when (val current = state) {
             is State.Ready -> current.snapshot.deepCopy()
             else -> {
-                val privateKeyPem = readPrivateKeyFromStoreOrThrow() ?: return@synchronized null
-                if (privateKeyPem.isEmpty()) return@synchronized null
+                val privateKeyPem = readPrivateKeyFromStoreOrThrow() ?: return@withLock null
+                if (privateKeyPem.isEmpty()) return@withLock null
                 validatePrivateKeyOrThrow(privateKeyPem)
                 CertUtils.identityFromPrivateKey(privateKeyPem, policy).snapshot.deepCopy()
             }
         }
     }
 
-    fun exportPrivateKeyOrNull(): ByteArray? = synchronized(lock) {
+    fun exportPrivateKeyOrNull(): ByteArray? = lock.withLock {
         when (val current = state) {
             is State.Ready -> current.snapshot.privateKeyPem.copyOf()
             else -> readPrivateKeyFromStoreOrThrow()?.copyOf()
         }
     }
 
-    fun clear() = synchronized(lock) {
+    fun clear() = lock.withLock {
         try {
             store.clear()
             state = State.Uninitialized
@@ -103,11 +105,11 @@ object KadbCert {
         }
     }
 
-    internal fun currentKeyPair(): AdbKeyPair = synchronized(lock) {
+    internal fun currentKeyPair(): AdbKeyPair = lock.withLock {
         ensureReadyStateLocked().keySet.defaultKeyPair
     }
 
-    internal fun currentKeySet(): HostKeySet = synchronized(lock) {
+    internal fun currentKeySet(): HostKeySet = lock.withLock {
         ensureReadyStateLocked().keySet
     }
 
@@ -160,24 +162,15 @@ object KadbCert {
             CertUtils.identityFromPrivateKeyAndCertificate(privateKeyPem, certificatePemBytes)
         }.getOrNull()
 
-        if (imported != null) {
-            val certificate = imported.keyPair.certificate as? X509Certificate
-            if (certificate != null) {
-                val certificateValid = runCatching {
-                    CertUtils.validateCertificate(certificate)
-                    true
-                }.getOrElse { false }
-                if (certificateValid) {
-                    return imported
-                }
-            }
+        if (imported != null && imported.keyPair.isCertificateValid()) {
+            return imported
         }
 
         return CertUtils.identityFromPrivateKey(privateKeyPem, policy)
     }
     private fun validatePrivateKeyOrThrow(privateKeyPem: ByteArray) {
         try {
-            CertUtils.parsePrivateKeyPem(privateKeyPem)
+            CertUtils.validatePrivateKeyPem(privateKeyPem)
         } catch (error: Throwable) {
             throw KadbCertException.fromPrivateKeyParseError(error)
         }
@@ -201,12 +194,12 @@ object KadbCert {
 
     private fun resolveHostKeySet(defaultKeyPair: AdbKeyPair): HostKeySet {
         val keyPairs = mutableListOf(defaultKeyPair)
-        val seenFingerprints = mutableSetOf(CertUtils.fingerprintSha256(defaultKeyPair.publicKey))
+        val seenFingerprints = mutableSetOf(defaultKeyPair.publicKeyFingerprint())
         for (privateKeyPem in additionalPrivateKeysPem) {
             val extraKeyPair = runCatching {
                 CertUtils.identityFromPrivateKey(privateKeyPem, policy).keyPair
             }.getOrNull() ?: continue
-            val fingerprint = CertUtils.fingerprintSha256(extraKeyPair.publicKey)
+            val fingerprint = extraKeyPair.publicKeyFingerprint()
             if (seenFingerprints.add(fingerprint)) {
                 keyPairs += extraKeyPair
             }

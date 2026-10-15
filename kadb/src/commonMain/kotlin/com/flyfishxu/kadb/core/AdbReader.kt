@@ -17,15 +17,21 @@
 
 package com.flyfishxu.kadb.core
 
+import com.flyfishxu.kadb.concurrent.BlockingLock
+import com.flyfishxu.kadb.concurrent.withLock
+import com.flyfishxu.kadb.debug.currentThreadName
 import com.flyfishxu.kadb.debug.log
+import kotlin.concurrent.Volatile
+import okio.IOException
 import okio.Source
 import okio.buffer
-import java.io.IOException
 
 internal class AdbReader(
     source: Source,
     maxPayloadSize: Int = AdbProtocol.CONNECT_MAXDATA
 ) : AutoCloseable {
+
+    private val lock = BlockingLock()
 
     private val bufferedSource = source.buffer()
     // Keep negotiated limits non-negative; AOSP negotiates max_payload with min(payload, MAX_PAYLOAD).
@@ -50,7 +56,7 @@ internal class AdbReader(
     }
 
     fun readMessage(): AdbMessage {
-        synchronized(bufferedSource) {
+        lock.withLock {
             bufferedSource.apply {
                 val command = readIntLe()
                 val arg0 = readIntLe()
@@ -81,7 +87,7 @@ internal class AdbReader(
                     magic,
                     payload
                 ).also {
-                    log { "(${Thread.currentThread().name}) < $it" }
+                    log { "(${currentThreadName()}) < $it" }
                 }
             }
         }

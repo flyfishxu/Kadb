@@ -1,28 +1,22 @@
 package com.flyfishxu.kadb.core
 
+import com.flyfishxu.kadb.KadbOptions
 import com.flyfishxu.kadb.cert.AdbKeyPair
-import com.flyfishxu.kadb.cert.AndroidPubkey
 import com.flyfishxu.kadb.cert.HostKeySet
 import com.flyfishxu.kadb.cert.platform.defaultDeviceName
-import com.flyfishxu.kadb.KadbOptions
-import com.flyfishxu.kadb.pair.SslUtils
 import com.flyfishxu.kadb.queue.AdbMessageQueue
 import com.flyfishxu.kadb.stream.AdbStream
-import com.flyfishxu.kadb.transport.TlsNioChannel
 import com.flyfishxu.kadb.transport.TransportChannel
 import com.flyfishxu.kadb.transport.TransportFactory
 import com.flyfishxu.kadb.transport.asOkioSink
 import com.flyfishxu.kadb.transport.asOkioSource
-import com.flyfishxu.kadb.tls.TlsErrorMapper
-import okio.Buffer
-import org.jetbrains.annotations.TestOnly
-import java.io.Closeable
-import java.io.IOException
-import java.security.interfaces.RSAPublicKey
-import java.util.*
-import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLProtocolException
+import com.flyfishxu.kadb.transport.mapInitialTlsReadError
+import com.flyfishxu.kadb.transport.upgradeTls
 import kotlin.Throws
+import kotlin.random.Random
+import okio.Buffer
+import okio.Closeable
+import okio.IOException
 
 internal class AdbConnection internal constructor(
     adbReader: AdbReader,
@@ -33,7 +27,7 @@ internal class AdbConnection internal constructor(
     private val outboundMaxPayloadSize: Int
 ) : AutoCloseable {
 
-    private val random = Random()
+    private val random = Random.Default
     private val messageQueue = AdbMessageQueue(adbReader) { closeable?.close() }
     val isOpen: Boolean get() = messageQueue.isOpen
     private val delayedAckEnabled = supportedFeatures.contains(AdbProtocol.FEATURE_DELAYED_ACK)
@@ -82,7 +76,6 @@ internal class AdbConnection internal constructor(
         return id
     }
 
-    @TestOnly
     internal fun ensureEmpty() {
         messageQueue.ensureEmpty()
     }
@@ -123,8 +116,8 @@ internal class AdbConnection internal constructor(
 
                 var message: AdbMessage = try {
                     reader.readMessage()
-                } catch (e: SSLProtocolException) {
-                    throw TlsErrorMapper.map(e)
+                } catch (e: Throwable) {
+                    throw mapInitialTlsReadError(e)
                 }
 
                 while (true) {
@@ -134,14 +127,7 @@ internal class AdbConnection internal constructor(
                             // AOSP host always sends STLS with the fixed protocol value A_STLS_VERSION.
                             // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/adb.cpp#318
                             writer.writeStls(AdbProtocol.A_STLS_VERSION)
-                            val sslContext = SslUtils.getSslContext(hostKeySet)
-                            val engine = SslUtils.newClientEngine(sslContext, host, port)
-                            val tlsChannel = TlsNioChannel(channel, engine)
-                            try {
-                                tlsChannel.handshake(ioTimeout, TimeUnit.MILLISECONDS)
-                            } catch (t: Throwable) {
-                                throw TlsErrorMapper.map(t)
-                            }
+                            val tlsChannel = upgradeTls(channel, host, port, hostKeySet, ioTimeout)
 
                             reader.close()
                             writer.close()
@@ -182,7 +168,7 @@ internal class AdbConnection internal constructor(
 
                 // parse_banner() accepts missing features and resets feature set to empty.
                 // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#351
-                val connectionString = parseConnectionString(String(message.payload))
+                val connectionString = parseConnectionString(message.payload.decodeToString())
                 val negotiatedFeatures = connectionString.features.intersect(advertisedFeatures)
                 // Mirror atransport::update_version(): protocol_version = min(peer_version, A_VERSION).
                 // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/transport.cpp#1172
@@ -310,9 +296,7 @@ internal class AdbConnection internal constructor(
     }
 }
 
-
 /*** ADB RSA Public Key Transformation Section ***/
 private fun adbPublicKey(keyPair: AdbKeyPair): ByteArray {
-    val publicKey = keyPair.publicKey as RSAPublicKey
-    return AndroidPubkey.encodeWithName(publicKey, defaultDeviceName())
+    return keyPair.encodeAdbPublicKey(defaultDeviceName())
 }

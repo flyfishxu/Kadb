@@ -9,7 +9,7 @@ It is intended for apps and tools that need shell, sync, install, pairing, or po
 ## Overview
 
 - Direct Kotlin API for `adbd`
-- Android and JVM targets
+- Android, JVM, and iOS targets (iOS support is currently in source; see [platform notes](docs/platform.md#ios))
 - Android and desktop JVM USB connections, wireless pairing, shell, file transfer, install, and TCP forwarding
 - AOSP-aligned host behavior where practical
 

@@ -19,8 +19,6 @@ package com.flyfishxu.kadb.pair
 import com.flyfishxu.kadb.cert.AdbKeyPair
 import com.flyfishxu.kadb.cert.CertUtils
 import com.flyfishxu.kadb.cert.HostKeySet
-import org.bouncycastle.asn1.x500.X500Name
-import org.bouncycastle.asn1.x500.style.BCStyle
 import java.net.Socket
 import java.security.NoSuchAlgorithmException
 import java.security.Principal
@@ -30,10 +28,12 @@ import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.Locale
 import javax.net.ssl.KeyManager
-import javax.net.ssl.SSLEngine
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLEngine
 import javax.net.ssl.X509ExtendedKeyManager
 import javax.net.ssl.X509TrustManager
+import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.asn1.x500.style.BCStyle
 
 internal object SslUtils {
     @Volatile

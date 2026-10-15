@@ -16,8 +16,7 @@
 package com.flyfishxu.kadb.core
 
 import com.flyfishxu.kadb.DelayedAckMode
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import okio.Buffer
 
 /**
  * This class provides useful functions and fields for ADB protocol details.
@@ -86,7 +85,7 @@ internal object AdbProtocol {
     fun connectPayload(features: List<String>): ByteArray {
         val featureList = features.distinct().joinToString(",")
         val payload = "host::features=$featureList"
-        val bytes = payload.toByteArray(Charsets.UTF_8)
+        val bytes = payload.encodeToByteArray()
         // AOSP limits connect/auth payload to MAX_PAYLOAD_V1 before maxdata negotiation.
         // https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/adb.cpp#338
         require(bytes.size <= MAX_PAYLOAD_V1) {
@@ -151,31 +150,27 @@ internal object AdbProtocol {
         //     unsigned magic;         // command ^ 0xffffffff
         // };
 
-        val message: ByteBuffer = if (data != null) {
-            ByteBuffer.allocate(ADB_HEADER_LENGTH + length).order(ByteOrder.LITTLE_ENDIAN)
-        } else {
-            ByteBuffer.allocate(ADB_HEADER_LENGTH).order(ByteOrder.LITTLE_ENDIAN)
-        }
+        val message = Buffer()
 
-        message.putInt(command)
-        message.putInt(arg0)
-        message.putInt(arg1)
+        message.writeIntLe(command)
+        message.writeIntLe(arg0)
+        message.writeIntLe(arg1)
 
         if (data != null) {
-            message.putInt(length)
-            message.putInt(getPayloadChecksum(data, offset, length))
+            message.writeIntLe(length)
+            message.writeIntLe(getPayloadChecksum(data, offset, length))
         } else {
-            message.putInt(0)
-            message.putInt(0)
+            message.writeIntLe(0)
+            message.writeIntLe(0)
         }
 
-        message.putInt(command.inv())
+        message.writeIntLe(command.inv())
 
         if (data != null) {
-            message.put(data, offset, length)
+            message.write(data, offset, length)
         }
 
-        return message.array()
+        return message.readByteArray()
     }
 
     /**

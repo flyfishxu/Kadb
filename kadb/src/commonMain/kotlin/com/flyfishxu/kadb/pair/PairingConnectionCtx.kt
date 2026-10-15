@@ -17,39 +17,16 @@
 package com.flyfishxu.kadb.pair
 
 import com.flyfishxu.kadb.cert.AdbKeyPair
-import com.flyfishxu.kadb.cert.AndroidPubkey.encodeWithName
-import java.io.Closeable
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.IOException
-import java.net.Socket
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.security.interfaces.RSAPublicKey
-import java.util.*
-import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLException
-import javax.net.ssl.SSLServerSocket
-import javax.net.ssl.SSLSocket
-import kotlin.Throws
-
-private const val EXPORTED_KEY_LABEL = "adb-label\u0000"
-private const val EXPORT_KEY_SIZE = 64
+import okio.Buffer
+import okio.Closeable
+import okio.IOException
 
 internal class PairingConnectionCtx(
-    host: String, private val mPort: Int, pwd: ByteArray, keyPair: AdbKeyPair, deviceName: String
+    host: String, port: Int, pwd: ByteArray, keyPair: AdbKeyPair, deviceName: String
 ) : Closeable {
-    private val mHost: String = Objects.requireNonNull(host)
-    private val mPwd: ByteArray = Objects.requireNonNull(pwd)
-    private val mPeerInfo: PeerInfo = PeerInfo(
-        PeerInfo.ADB_RSA_PUB_KEY, encodeWithName(
-            (keyPair.certificate.publicKey as RSAPublicKey), Objects.requireNonNull(deviceName)
-        )
-    )
-    private val mSslContext: SSLContext = SslUtils.getSslContext(keyPair)
-    private val mRole = Role.Client
-    private var mInputStream: DataInputStream? = null
-    private var mOutputStream: DataOutputStream? = null
+    private val mPwd = pwd
+    private val mPeerInfo = PeerInfo(PeerInfo.ADB_RSA_PUB_KEY, keyPair.encodeAdbPublicKey(deviceName))
+    private val transport = PairingTlsConnection(host, port, keyPair)
     private var mPairingAuthCtx: PairingAuthCtx? = null
     private var mState = State.Ready
 
@@ -94,68 +71,30 @@ internal class PairingConnectionCtx(
 
     @Throws(IOException::class)
     private fun setupTlsConnection() {
-        val socket: Socket = if (mRole == Role.Server) {
-            val sslServerSocket = mSslContext.serverSocketFactory.createServerSocket(mPort) as SSLServerSocket
-            sslServerSocket.accept()
-        } else { // role == Role.Client
-            Socket(mHost, mPort)
-        }
-        socket.tcpNoDelay = true
-
-        // We use custom SSLContext to allow any SSL certificates
-        val sslSocket = mSslContext.socketFactory.createSocket(socket, mHost, mPort, true) as SSLSocket
-        sslSocket.startHandshake()
-        mInputStream = DataInputStream(sslSocket.inputStream)
-        mOutputStream = DataOutputStream(sslSocket.outputStream)
-
-        // To ensure the connection is not stolen while we do the PAKE,
-        // append the exported key material from the TLS connection to the password.
-        val keyMaterial = exportKeyingMaterial(sslSocket, EXPORT_KEY_SIZE)
+        transport.start()
+        // Bind the PAKE password to this TLS session, as required by ADB.
+        val keyMaterial = transport.exportKeyingMaterial()
         val passwordBytes = ByteArray(mPwd.size + keyMaterial.size)
-        System.arraycopy(mPwd, 0, passwordBytes, 0, mPwd.size)
-        System.arraycopy(keyMaterial, 0, passwordBytes, mPwd.size, keyMaterial.size)
+        mPwd.copyInto(passwordBytes)
+        keyMaterial.copyInto(passwordBytes, mPwd.size)
         val pairingAuthCtx =
             PairingAuthCtx.createAlice(passwordBytes) ?: throw IOException("Unable to create PairingAuthCtx.")
         mPairingAuthCtx = pairingAuthCtx
     }
 
-    @Throws(SSLException::class)
-    private fun exportKeyingMaterial(sslSocket: SSLSocket, length: Int): ByteArray {
-        // Conscrypt#exportKeyingMaterial(SSLSocket socket, String label, byte[] context, int length): byte[]
-        //          throws SSLException
-        return try {
-            val conscryptClass: Class<*> = getConscryptClass()
-            val exportKeyingMaterial = conscryptClass.getMethod(
-                "exportKeyingMaterial",
-                SSLSocket::class.java,
-                String::class.java,
-                ByteArray::class.java,
-                Int::class.javaPrimitiveType
-            )
-            exportKeyingMaterial.invoke(
-                null, sslSocket, EXPORTED_KEY_LABEL, null, length
-            ) as ByteArray
-        } catch (e: SSLException) {
-            throw e
-        } catch (th: Throwable) {
-            throw SSLException(th)
-        }
-    }
-
     @Throws(IOException::class)
     private fun writeHeader(header: PairingPacketHeader, payload: ByteArray) {
-        val buffer =
-            ByteBuffer.allocate(PairingPacketHeader.PAIRING_PACKET_HEADER_SIZE.toInt()).order(ByteOrder.BIG_ENDIAN)
+        val buffer = Buffer()
         header.writeTo(buffer)
-        mOutputStream!!.write(buffer.array())
-        mOutputStream!!.write(payload)
+        transport.write(buffer.readByteArray())
+        transport.write(payload)
     }
 
     @Throws(IOException::class)
     private fun readHeader(): PairingPacketHeader? {
         val bytes = ByteArray(PairingPacketHeader.PAIRING_PACKET_HEADER_SIZE.toInt())
-        mInputStream!!.readFully(bytes)
-        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
+        transport.readFully(bytes)
+        val buffer = Buffer().write(bytes)
         return PairingPacketHeader.readFrom(buffer)
     }
 
@@ -185,20 +124,20 @@ internal class PairingConnectionCtx(
 
         // Read the SPAKE2 msg payload and initialize the cipher for encrypting the PeerInfo and certificate.
         val theirMsg = ByteArray(theirHeader.payloadSize)
-        mInputStream!!.readFully(theirMsg)
+        transport.readFully(theirMsg)
         return try {
             mPairingAuthCtx!!.initCipher(theirMsg)
         } catch (e: Exception) {
-            throw (IOException().initCause(e) as IOException)
+            throw IOException(null, e)
         }
     }
 
     @Throws(IOException::class)
     private fun doExchangePeerInfo(): Boolean {
         // Encrypt PeerInfo
-        val buffer = ByteBuffer.allocate(PeerInfo.MAX_PEER_INFO_SIZE).order(ByteOrder.BIG_ENDIAN)
+        val buffer = Buffer()
         mPeerInfo.writeTo(buffer)
-        val outBuffer = mPairingAuthCtx!!.encrypt(buffer.array()) ?: return false
+        val outBuffer = mPairingAuthCtx!!.encrypt(buffer.readByteArray()) ?: return false
         // Write out the packet header
         val ourHeader = createHeader(PairingPacketHeader.PEER_INFO, outBuffer.size)
         // Write out the encrypted payload
@@ -213,7 +152,7 @@ internal class PairingConnectionCtx(
 
         // Read in the encrypted peer certificate
         val theirMsg = ByteArray(theirHeader.payloadSize)
-        mInputStream!!.readFully(theirMsg)
+        transport.readFully(theirMsg)
 
         // Try to decrypt the certificate
         val decryptedMsg = mPairingAuthCtx!!.decrypt(theirMsg) ?: return false
@@ -222,20 +161,13 @@ internal class PairingConnectionCtx(
         if (decryptedMsg.size != PeerInfo.MAX_PEER_INFO_SIZE) {
             return false
         }
-        PeerInfo.readFrom(ByteBuffer.wrap(decryptedMsg))
+        PeerInfo.readFrom(Buffer().write(decryptedMsg))
         return true
     }
 
     override fun close() {
-        Arrays.fill(mPwd, 0.toByte())
-        try {
-            mInputStream?.close()
-        } catch (_: IOException) {
-        }
-        try {
-            mOutputStream?.close()
-        } catch (_: IOException) {
-        }
+        mPwd.fill(0)
+        transport.close()
         if (mState != State.Ready) {
             mPairingAuthCtx?.destroy()
         }
@@ -245,19 +177,15 @@ internal class PairingConnectionCtx(
         Ready, ExchangingMsgs, ExchangingPeerInfo, Stopped
     }
 
-    internal enum class Role {
-        Client, Server
-    }
-
     private class PeerInfo(private val type: Byte, data: ByteArray) {
         private val data = ByteArray(MAX_PEER_INFO_SIZE - 1)
 
         init {
-            System.arraycopy(data, 0, this.data, 0, data.size.coerceAtMost(MAX_PEER_INFO_SIZE - 1))
+            data.copyInto(this.data, endIndex = data.size.coerceAtMost(MAX_PEER_INFO_SIZE - 1))
         }
 
-        fun writeTo(buffer: ByteBuffer) {
-            buffer.put(type).put(data)
+        fun writeTo(buffer: Buffer) {
+            buffer.writeByte(type.toInt()).write(data)
         }
 
         override fun toString(): String {
@@ -270,10 +198,10 @@ internal class PairingConnectionCtx(
             // AOSP pairing PeerInfoType uses 1 for ADB_DEVICE_GUID.
             // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/pairing_connection/include/adb/pairing/pairing_connection.h#50
             const val ADB_DEVICE_GUID: Byte = 1
-            fun readFrom(buffer: ByteBuffer): PeerInfo {
-                val type = buffer.get()
+            fun readFrom(buffer: Buffer): PeerInfo {
+                val type = buffer.readByte()
                 val data = ByteArray(MAX_PEER_INFO_SIZE - 1)
-                buffer[data]
+                buffer.readFully(data)
                 return PeerInfo(type, data)
             }
         }
@@ -282,8 +210,8 @@ internal class PairingConnectionCtx(
     private class PairingPacketHeader(
         private val version: Byte, val type: Byte, val payloadSize: Int
     ) {
-        fun writeTo(buffer: ByteBuffer) {
-            buffer.put(version).put(type).putInt(payloadSize)
+        fun writeTo(buffer: Buffer) {
+            buffer.writeByte(version.toInt()).writeByte(type.toInt()).writeInt(payloadSize)
         }
 
         override fun toString(): String {
@@ -298,10 +226,10 @@ internal class PairingConnectionCtx(
             const val PAIRING_PACKET_HEADER_SIZE: Byte = 6
             const val SPAKE2_MSG: Byte = 0
             const val PEER_INFO: Byte = 1
-            fun readFrom(buffer: ByteBuffer): PairingPacketHeader? {
-                val version = buffer.get()
-                val type = buffer.get()
-                val payload = buffer.getInt()
+            fun readFrom(buffer: Buffer): PairingPacketHeader? {
+                val version = buffer.readByte()
+                val type = buffer.readByte()
+                val payload = buffer.readInt()
                 if (version < MIN_SUPPORTED_KEY_HEADER_VERSION || version > MAX_SUPPORTED_KEY_HEADER_VERSION) {
                     return null
                 }
@@ -316,5 +244,3 @@ internal class PairingConnectionCtx(
         }
     }
 }
-
-internal expect fun PairingConnectionCtx.getConscryptClass(): Class<*>

@@ -17,10 +17,11 @@
 
 package com.flyfishxu.kadb.debug
 
-private val ENABLED = "true" == System.getenv("KADB_LOGGING")
+internal expect val loggingEnabled: Boolean
+internal expect fun currentThreadName(): String
 
 internal fun log(block: () -> String) {
-    if (ENABLED) {
+    if (loggingEnabled) {
         println(block())
     }
 }

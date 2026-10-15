@@ -17,13 +17,12 @@
 
 package com.flyfishxu.kadb.stream
 
+import kotlin.Throws
 import okio.Buffer
 import okio.BufferedSink
+import okio.IOException
 import okio.Sink
 import okio.Source
-import java.io.IOException
-import java.nio.charset.StandardCharsets
-import kotlin.Throws
 
 private const val ID_LSTAT_V1 = "STAT"
 private const val ID_STAT_V2 = "STA2"
@@ -103,7 +102,7 @@ class AdbSyncStream(
 
     private val buffer = Buffer()
     private val isWindowsHost =
-        System.getProperty("os.name")?.startsWith("Windows", ignoreCase = true) == true
+        isWindowsHost()
 
     @Throws(IOException::class)
     fun send(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
@@ -170,7 +169,7 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     private fun sendV1(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
-        val remote = "$remotePath,$mode".toByteArray(StandardCharsets.UTF_8)
+        val remote = "$remotePath,$mode".encodeToByteArray()
         enforcePathLength(remote.size, ID_SEND_V1)
         writeRequest(ID_SEND_V1, remote)
         writeSourcePayload(source, lastModifiedMs)
@@ -179,15 +178,15 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     private fun sendV2(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
-        val path = remotePath.toByteArray(StandardCharsets.UTF_8)
+        val path = remotePath.encodeToByteArray()
         enforcePathLength(path.size, ID_SEND_V2)
         stream.sink.apply {
-            writeString(ID_SEND_V2, StandardCharsets.UTF_8)
+            writeUtf8(ID_SEND_V2)
             writeIntLe(path.size)
             write(path)
             // AOSP send_v2 setup is sync_send_v2{id, mode, flags}.
             // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/file_sync_protocol.h#113
-            writeString(ID_SEND_V2, StandardCharsets.UTF_8)
+            writeUtf8(ID_SEND_V2)
             writeIntLe(mode)
             writeIntLe(0)
             flush()
@@ -224,7 +223,7 @@ class AdbSyncStream(
         when (packet.id) {
             ID_OKAY -> return
             ID_FAIL -> {
-                val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
+                val message = stream.source.readUtf8(packet.arg.toLong())
                 throw IOException("Sync failed: $message")
             }
 
@@ -234,7 +233,7 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     private fun recvV1(sink: Sink, remotePath: String) {
-        val path = remotePath.toByteArray(StandardCharsets.UTF_8)
+        val path = remotePath.encodeToByteArray()
         enforcePathLength(path.size, ID_RECV_V1)
         writeRequest(ID_RECV_V1, path)
         readRecvPayload(sink)
@@ -242,15 +241,15 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     private fun recvV2(sink: Sink, remotePath: String) {
-        val path = remotePath.toByteArray(StandardCharsets.UTF_8)
+        val path = remotePath.encodeToByteArray()
         enforcePathLength(path.size, ID_RECV_V2)
         stream.sink.apply {
-            writeString(ID_RECV_V2, StandardCharsets.UTF_8)
+            writeUtf8(ID_RECV_V2)
             writeIntLe(path.size)
             write(path)
             // AOSP recv_v2 setup is sync_recv_v2{id, flags}.
             // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/file_sync_protocol.h#120
-            writeString(ID_RECV_V2, StandardCharsets.UTF_8)
+            writeUtf8(ID_RECV_V2)
             writeIntLe(0)
             flush()
         }
@@ -276,7 +275,7 @@ class AdbSyncStream(
 
                 ID_DONE -> break
                 ID_FAIL -> {
-                    val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
+                    val message = stream.source.readUtf8(packet.arg.toLong())
                     throw IOException("Sync failed: $message")
                 }
 
@@ -289,7 +288,7 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     private fun readStatV2(path: String, requestId: String, apiName: String): AdbSyncStatV2 {
-        val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
+        val pathBytes = path.encodeToByteArray()
         enforcePathLength(pathBytes.size, requestId)
         writeRequest(requestId, pathBytes)
 
@@ -320,7 +319,7 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     private fun readLstatV1(path: String): AdbSyncStat {
-        val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
+        val pathBytes = path.encodeToByteArray()
         enforcePathLength(pathBytes.size, ID_LSTAT_V1)
         writeRequest(ID_LSTAT_V1, pathBytes)
 
@@ -341,7 +340,7 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     private fun readListV1(path: String): List<AdbSyncDirEntry> {
-        val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
+        val pathBytes = path.encodeToByteArray()
         enforcePathLength(pathBytes.size, ID_LIST_V1)
         writeRequest(ID_LIST_V1, pathBytes)
 
@@ -371,7 +370,7 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     private fun readListV2(path: String): List<AdbSyncDirEntryV2> {
-        val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
+        val pathBytes = path.encodeToByteArray()
         enforcePathLength(pathBytes.size, ID_LIST_V2)
         writeRequest(ID_LIST_V2, pathBytes)
 
@@ -458,7 +457,7 @@ class AdbSyncStream(
     }
 
     private fun BufferedSink.writeFrameHeader(id: String, arg: Int) {
-        writeString(id, StandardCharsets.UTF_8)
+        writeUtf8(id)
         writeIntLe(arg)
     }
 
@@ -473,7 +472,7 @@ class AdbSyncStream(
         if (length < 0 || length > NAME_MAX) {
             throw IOException("Invalid sync name length: $length")
         }
-        return stream.source.readString(length.toLong(), StandardCharsets.UTF_8)
+        return stream.source.readUtf8(length.toLong())
     }
 
     private fun validateEntryName(name: String) {
@@ -508,11 +507,11 @@ class AdbSyncStream(
         if (messageLength < 0) {
             return IOException("Sync failed with invalid message length: $messageLength")
         }
-        val message = stream.source.readString(messageLength.toLong(), StandardCharsets.UTF_8)
+        val message = stream.source.readUtf8(messageLength.toLong())
         return IOException("Sync failed: $message")
     }
 
-    private fun readSyncId(): String = stream.source.readString(4, StandardCharsets.UTF_8)
+    private fun readSyncId(): String = stream.source.readUtf8(4)
 
     private fun readUInt32AsLong(): Long = stream.source.readIntLe().toLong() and 0xFFFF_FFFFL
 
@@ -521,3 +520,5 @@ class AdbSyncStream(
         stream.close()
     }
 }
+
+internal expect fun isWindowsHost(): Boolean

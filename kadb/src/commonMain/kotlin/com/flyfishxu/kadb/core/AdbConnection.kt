@@ -100,13 +100,16 @@ internal class AdbConnection internal constructor(
             options: KadbOptions = KadbOptions(),
             connectTimeoutMs: Int = 10_000,
             ioTimeoutMs: Int = 0,
+            transportConnector: (suspend () -> TransportChannel)? = null,
             onTransportCreated: (TransportChannel) -> Unit = {}
         ): Pair<AdbConnection, TransportChannel> {
             val connectTimeout = connectTimeoutMs.toLong()
             val ioTimeout = ioTimeoutMs.toLong()
             var authKeyIndex = 0
+            var staleStreamPackets = 0
 
-            var channel: TransportChannel = TransportFactory.connect(host, port, connectTimeout, options.tcpKeepAlive)
+            var channel: TransportChannel = transportConnector?.invoke()
+                ?: TransportFactory.connect(host, port, connectTimeout, options.tcpKeepAlive)
             var reader = AdbReader(channel.asOkioSource(ioTimeout))
             var writer = AdbWriter(channel.asOkioSink(ioTimeout))
 
@@ -127,6 +130,7 @@ internal class AdbConnection internal constructor(
                 while (true) {
                     when (message.command) {
                         AdbProtocol.CMD_STLS -> {
+                            check(transportConnector == null) { "TLS upgrade is not supported on USB" }
                             // AOSP host always sends STLS with the fixed protocol value A_STLS_VERSION.
                             // https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/adb.cpp#318
                             writer.writeStls(AdbProtocol.A_STLS_VERSION)
@@ -161,6 +165,16 @@ internal class AdbConnection internal constructor(
                         }
 
                         AdbProtocol.CMD_CNXN -> break
+
+                        AdbProtocol.CMD_CLSE, AdbProtocol.CMD_OKAY, AdbProtocol.CMD_WRTE -> {
+                            // Reclaiming a USB interface does not reset its endpoint queues.
+                            // Ignore old stream replies until the new CNXN handshake completes;
+                            // never replay their commands or relax fresh TCP/TLS handshakes.
+                            if (!channel.mayHaveStaleStreamPackets || ++staleStreamPackets > 64) {
+                                throw IOException("Connection failed: $message")
+                            }
+                            message = reader.readMessage()
+                        }
 
                         else -> throw IOException("Connection failed: $message")
                     }

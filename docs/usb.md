@@ -53,24 +53,11 @@ initial authorization waiting and close the pending Kadb when the user cancels;
 have a bounded timeout. After unplug/replug, enumerate, select and check permission
 again; USB bus addresses must not be persisted as device identity.
 
-The packet bridge preserves separate header/payload transfers, emits host-side
-zero-length packets when required, and limits transfers to 16 KiB for older Android
-versions. Tests cover fragmented buffered writes, aligned payload reads, invalid
-headers, partial writes and close cancellation using a fake USB backend. Actual
-USB controller behavior, authorization, throughput and hot unplug require hardware
-validation.
-
-On USB, releasing the interface does not necessarily empty its endpoint queues.
-During a new handshake Kadb discards up to 64 stale `CLSE`, `OKAY`, or `WRTE` packets
-before the new `CNXN`; malformed packets still fail, and TCP/TLS handshakes remain
-strict. A hardware reconnect test exposed this case and a regression test covers it.
-
 ## Desktop JVM
 
 The JVM artifact uses [Java Does USB 1.3.0](https://github.com/manuelbl/JavaDoesUSB/tree/v1.3.0)
 to call native OS APIs directly. No adb executable/server, JNI bundle or libusb install
-is needed. This feature is in `2.1.5-usb-SNAPSHOT` on the `usb-support` branch; it is
-not in the published `2.1.4` release.
+is needed.
 
 Use Java 25+ and grant native access with `--enable-native-access=ALL-UNNAMED` on the
 classpath, or `--enable-native-access=net.codecrete.usb` on the module path. Gradle
@@ -103,8 +90,6 @@ dialog on desktop. The library does not stop other USB owners or change OS drive
 - Windows: requires a compatible WinUSB driver for the ADB interface.
 
 These platform requirements follow the [backend documentation](https://github.com/manuelbl/JavaDoesUSB/tree/v1.3.0#platform-specific-considerations).
-The backend supports macOS, Linux and Windows, but only macOS arm64 has been tested
-on real hardware in this checkout. Other platforms still need device validation.
 
 ### Desktop hardware test
 
@@ -116,59 +101,19 @@ serial it only lists available ADB-capable devices:
 ./gradlew :kadb:desktopUsbSmoke -PusbSerial=YOUR_USB_SERIAL
 ```
 
-The second command tests shell, interactive stdin, binary output, sync/stat/list,
-12 transfer-size boundaries, 32 MiB checksums, concurrent streams, cancellation and
-20 close/reopen cycles. Files use a unique `/data/local/tmp/kadb-desktop-usb-*`
-directory and are cleaned up. The harness creates its own persistent test key under
-`kadb/build/usb-smoke`; approve it on the target. Alternatively, pass an existing host
-key explicitly with `-PusbKey=/absolute/path/to/adbkey`; it is read without modification.
-The target's `ro.serialno` must match the selected USB serial before any files are created.
+The second command checks shell, file integrity, concurrent streams, cancellation and
+reconnection. It creates temporary files on the target and removes them during cleanup.
+The harness stores its test identity under `kadb/build/usb-smoke`; approve it on the
+target when prompted. To reuse an existing identity without modifying its key file,
+pass `-PusbKey=/absolute/path/to/adbkey`.
 
 Ensure adb or another tool has released the device. If that adb backend supports it,
 use `adb -s SERIAL detach` / `attach`; otherwise stop and restore the adb server around
 the run, accounting for active wireless debug sessions. Kadb never does this automatically.
 
-An optional `-PusbApk=/absolute/path/to/fixture.apk` also tests installation and uninstall.
-Only supply the disposable `com.flyfishxu.kadb.usb.smoke.fixture` APK built by the sibling
-WearOS-Toolbox `scripts/build-usb-smoke-fixture.sh`; existing fixture installations are
-not replaced. Accept any target-side installation prompt.
+## Validation limits
 
-### Desktop validation status (2026-09-29)
-
-On macOS arm64 / Java 25 with a USB-connected OPPO PKM110, the initial full run passed
-shell, stdin/EOF, binary exec, all sync boundaries/stat/list, 32 MiB three-way SHA-256,
-concurrent transfers/probes, error recovery, cancellation and 20 reconnects.
-The 32 MiB upload took 1.281 seconds and download 6.004 seconds in that run.
-Unit checks passed: 27 JVM tests and 23 Android host tests.
-
-Subsequent runs encountered interface ownership conflicts and device re-enumeration
-while Android Studio automatically restarted adb. APK installation was not reached.
-Further repeated-reconnect and installation validation requires running without a
-competing USB owner. Test artifacts and logs are under `build/reports/desktop-usb/`.
-No physical hot-unplug or Windows/Linux hardware validation has been performed.
-
-## Android hardware verification
-
-The sibling WearOS-Toolbox checkout contains an opt-in instrumentation runner that
-calls Kadb directly while reusing the application's USB permission and ADB identity.
-See its `docs/usb-hardware-testing.md` for commands and fixture generation. Publish
-the local snapshot below before building the runner.
-
-On 2026-09-29, an Android USB host connected to a Redmi Note 11 Pro passed shell
-stdout/stderr/exit/Unicode, interactive stdin/EOF, 1 MiB binary exec, 12 sync file-size
-boundaries, stat/list, 32 MiB push/pull with local and remote SHA-256 agreement,
-three concurrent 4 MiB transfers with 20 shell probes, missing-file recovery,
-single-stream cancellation, closing blocked readers, and 50 consecutive reconnects.
-The 32 MiB transfer took 2.584 seconds to push and 1.924 seconds to pull on that run;
-these are single-device observations, not benchmark guarantees.
-
-The first run exposed the stale-stream-packet reconnect bug above. The first run
-after updating the snapshot also timed out during initial handshake; its cause was
-not established. Subsequent full-suite runs passed, including the 50-reconnect run.
-APK installation initially returned `INSTALL_FAILED_USER_RESTRICTED` while the
-target's confirmation was not accepted. After accepting its install prompt, USB
-installation, package-presence verification, and uninstall all passed using an
-empty permission-free fixture APK. All test files and the fixture were removed.
-Physical hot unplug, authorization denial and scrcpy are not covered by these results.
-
-Protocol reference: [AOSP USB zero-length packets](https://android.googlesource.com/platform/packages/modules/adb/+/HEAD/docs/dev/zero_length_packet.md).
+Basic USB operations have been exercised on Android and macOS arm64. Windows and
+Linux still need hardware validation. Desktop APK installation, physical hot unplug,
+initial authorization denial and scrcpy have not been validated end to end.
+An initial-handshake timeout was observed on Android and remains undiagnosed.

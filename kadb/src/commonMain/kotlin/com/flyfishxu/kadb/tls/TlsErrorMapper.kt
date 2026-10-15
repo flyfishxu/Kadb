@@ -34,6 +34,7 @@ internal object TlsErrorMapper {
         if (messages.contains("certificate_required") ||
             messages.contains("unknown_ca") ||
             messages.contains("access_denied") ||
+            messages.contains("protocol error") ||
             messages.contains("certificate_unknown")) {
             return AdbPairAuthException()
         }

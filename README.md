@@ -6,8 +6,6 @@ Kadb is a Kotlin Multiplatform ADB client library for talking directly to `adbd`
 
 It is intended for apps and tools that need shell, sync, install, pairing, or port forwarding without embedding the full `adb` CLI or server stack.
 
-[USB (Android and desktop)](docs/usb.md) · [Platform Notes](docs/platform.md) · [mDNS Discovery](docs/mdns.md) · [Host Identity](docs/kadbcert.md) · [Docs Index](docs/README.md)
-
 ## Overview
 
 - Direct Kotlin API for `adbd`
@@ -15,13 +13,17 @@ It is intended for apps and tools that need shell, sync, install, pairing, or po
 - Android and desktop JVM USB connections, wireless pairing, shell, file transfer, install, and TCP forwarding
 - AOSP-aligned host behavior where practical
 
-Kadb is not a full adb server replacement. Transport brokering and server-style device tracking are out of scope. Android USB Host and desktop JVM USB are supported through platform-specific `KadbUsb` APIs.
+## Powered by Kadb
+
+Kadb powers [WearOS Toolbox](https://wearosbox.com/), an Android smartwatch toolbox
+for connecting to watches, managing apps, and transferring files.
+Both Kadb and WearOS Toolbox are developed by Flyfish Studio.
 
 ## Installation
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:2.1.4")
+    implementation("com.flyfishxu:kadb:2.1.5")
 }
 ```
 
@@ -29,7 +31,7 @@ Optional mDNS discovery:
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb-mdns:2.1.4")
+    implementation("com.flyfishxu:kadb-mdns:2.1.5")
 }
 ```
 
@@ -69,7 +71,8 @@ Discovered endpoints can be passed to `Kadb.create(host, port)` or `Kadb.pair(ho
 
 | Capability | API |
 | --- | --- |
-| Connect to `adbd` | `Kadb.create(...)` |
+| Connect to `adbd` over TCP | `Kadb.create(...)` |
+| USB discovery / connection | Platform-specific `KadbUsb.devices(...)`, `KadbUsb.create(...)` |
 | Wireless pairing | `Kadb.pair(...)` |
 | Shell | `shell(...)`, `openShell()`, `openPtyShellSession()` |
 | File transfer | `push(...)`, `pull(...)`, `openSync()` |
@@ -119,24 +122,23 @@ Example JVM pairing dependency:
 
 ```kotlin
 dependencies {
-    implementation("com.flyfishxu:kadb:2.1.4")
+    implementation("com.flyfishxu:kadb:2.1.5")
     implementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
 }
 ```
 
-More detail: [docs/platform.md](docs/platform.md)
-
 ## Scope and Limitations
 
-- Kadb is a direct client library, not a full adb server
-- USB Host support is Android-only; desktop USB still requires external tooling
+- Kadb is a direct client library; transport brokering and adb server-style device tracking are out of scope.
+- USB connections are available on Android and desktop JVM. A device's USB interface must be released by other tools before Kadb can claim it.
 
 ## Documentation
 
-- [Documentation Index](docs/README.md)
-- [Platform Notes](docs/platform.md)
-- [mDNS Discovery](docs/mdns.md)
-- [KadbCert](docs/kadbcert.md)
+- [USB connections](docs/usb.md) — Android and desktop setup, permissions, and connection lifecycle
+- [Platform notes](docs/platform.md) — runtime requirements and pairing dependencies
+- [mDNS discovery](docs/mdns.md) — discovering wireless debugging endpoints
+- [Host identity](docs/kadbcert.md) — managing and persisting ADB credentials
+- [Security policy](SECURITY.md) — reporting vulnerabilities privately
 
 ## Acknowledgements
 

@@ -72,7 +72,7 @@ mavenPublishing {
         signAllPublications()
     }
 
-    coordinates("com.flyfishxu", "kadb", "2.1.5-usb-SNAPSHOT")
+    coordinates("com.flyfishxu", "kadb", "2.1.5")
 
     pom {
 
